@@ -39,7 +39,7 @@ Open VSCode:
 
     code .
 
-Then hit `F5 (Start Debugging)` to run the extension. Edit a zen-lang
+Then hit `F5 (Start Debugging)` to run the extension. Edit a zen-lang file
 (`.edn`) and you will get diagnostic feedback.
 
 #### VSIX package
