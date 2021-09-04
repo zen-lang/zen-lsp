@@ -52,6 +52,13 @@ run:
 This will create a `.vsix` file in the `vscode-extension` directory which you
 can install in VSCode.
 
+
+#### start with cider nrepl
+
+Extension will be started with vscode-extension/debug-srv script
+This script start LSP server + nrepl with cider mw
+Then you can connect to nrepl (see .nrepl-port) from emacs
+
 ## License
 
 TODO

@@ -1,0 +1,23 @@
+{:paths ["src"]
+
+ :deps {org.clojure/clojure  {:mvn/version "1.10.3"}
+        org.eclipse.lsp4j/org.eclipse.lsp4j {:mvn/version "0.12.0"}
+        zen-lang/zen         {:git/url "https://github.com/zen-lang/zen"
+                              :sha "bb7e33ea4232d4d29c4f959f13895f17eedeabb7"}}
+
+ :aliases
+ {:nrepl
+  {:extra-paths ["dev"]
+   :extra-deps  {cider/cider-nrepl {:mvn/version "LATEST"}}
+
+   :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]}
+
+  :test {:extra-paths ["test"]
+         :extra-deps {healthsamurai/matcho {:mvn/version "0.3.7"}}
+         :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]}
+
+  :kaocha
+  {:extra-deps {lambdaisland/kaocha  {:mvn/version "1.0-612"}}
+   :extra-paths ["test"]
+   :jvm-opts    ^:replace ["-XX:-OmitStackTraceInFastThrow"]
+   :main-opts   ["-m" "kaocha.runner" "--config-file" "test/test.edn"]}}}

@@ -32,7 +32,7 @@ export function activate(context: ExtensionContext) {
     let jarPath = path.join(context.extensionPath, 'zen-lsp-standalone.jar');
     let serverOptions: ServerOptions = {
         run: {command: 'java', args:['-jar', jarPath] },
-        debug: {command: 'java', args:['-jar', jarPath]},
+        debug: {command: path.join(context.extensionPath, 'debug-srv'), args:[]},
     }
 
     // If the extension is launched in debug mode then the debug server options are used
