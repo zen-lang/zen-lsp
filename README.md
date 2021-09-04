@@ -7,6 +7,10 @@ This repo contains the code for:
 
 ## Build
 
+To run build tasks in this project, use [babashka](https://babashka.org/). You
+will also need [lein](https://leiningen.org/) (although we could port this
+project to the new clojure CLI).
+
 Run `bb tasks` to get a full overview of how to build this project.
 
 ### Server
