@@ -9,8 +9,6 @@ This repo contains the code for:
 
 Run `bb tasks` to get a full overview of how to build this project.
 
-The project consists of two parts: the LSP server in the `server` directory and the VSCode extension in `vscode-extension`.
-
 ### Server
 
 To build the server uberjar, run:
