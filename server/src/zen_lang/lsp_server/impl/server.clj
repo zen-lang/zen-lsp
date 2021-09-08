@@ -1,5 +1,10 @@
 (ns zen-lang.lsp-server.impl.server
   {:no-doc true}
+  (:require #_[borkdude.rewrite-edn :as redn]
+            [clojure.string :as str]
+            [edamame.core :as e]
+            [zen.core :as zen]
+            [zen.store :as store])
   (:import [java.util.concurrent CompletableFuture]
            [org.eclipse.lsp4j
             Diagnostic
@@ -25,10 +30,7 @@
             TextDocumentSyncKind
             TextDocumentSyncOptions]
            [org.eclipse.lsp4j.launch LSPLauncher]
-           [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient])
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]))
-
+           [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
 
 (set! *warn-on-reflection* true)
 
@@ -103,18 +105,34 @@
         lang
         :clj))))
 
+(defn error->finding [edn error]
+  (let [message (:message error)
+        ;; path (:path error)
+        resource (:resource error)
+        resource-path (some-> resource name symbol)
+        path [resource-path]
+        val (reduce (fn [edn k]
+                      (let [new-edn (get edn k)]
+                        (if (meta new-edn)
+                          new-edn
+                          edn)))
+                    edn
+                    path)
+        loc (meta val)
+        finding (assoc loc :message message :level :warning)]
+    finding))
+
 (defn lint! [text uri]
   (when-not (str/ends-with? uri ".calva/output-window/output.calva-repl")
     (let [_lang (uri->lang uri)
-          _path (-> (java.net.URI. uri)
+          path (-> (java.net.URI. uri)
                    (.getPath))
-          {:keys [:findings]} (with-in-str text
-                                {:findings [{:row 1
-                                             :col 1
-                                             :end-row 2
-                                             :end-col 2
-                                             :message "zen-lang rules"
-                                             :level :warning}]})
+          edn (e/parse-string text)
+          ctx (zen/new-context {:unsafe true})
+          _ (store/load-ns ctx edn {:zen/file path})
+          errors (:errors @ctx)
+          findings (map #(error->finding edn %) errors)
+          {:keys [:findings]} {:findings findings}
           lines (str/split text #"\r?\n")
           diagnostics (vec (keep #(finding->Diagnostic lines %) findings))]
       (debug "publishing diagnostics")
