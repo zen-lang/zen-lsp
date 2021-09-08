@@ -1,8 +1,9 @@
 (ns zen-lang.lsp-server.impl.server
   {:no-doc true}
-  (:require #_[borkdude.rewrite-edn :as redn]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [edamame.core :as e]
+            [rewrite-clj.parser :as p]
+            [zen-lang.lsp-server.impl.location :refer [get-location]]
             [zen.core :as zen]
             [zen.store :as store])
   (:import [java.util.concurrent CompletableFuture]
@@ -105,20 +106,13 @@
         lang
         :clj))))
 
-(defn error->finding [edn error]
+(defn error->finding [edn-node error]
   (let [message (:message error)
         ;; path (:path error)
         resource (:resource error)
         resource-path (some-> resource name symbol)
-        path [resource-path]
-        val (reduce (fn [edn k]
-                      (let [new-edn (get edn k)]
-                        (if (meta new-edn)
-                          new-edn
-                          edn)))
-                    edn
-                    path)
-        loc (meta val)
+        path (cons resource-path (:path error))
+        loc (get-location edn-node path)
         finding (assoc loc :message message :level :warning)]
     finding))
 
@@ -131,7 +125,8 @@
           ctx (zen/new-context {:unsafe true})
           _ (store/load-ns ctx edn {:zen/file path})
           errors (:errors @ctx)
-          findings (map #(error->finding edn %) errors)
+          edn-node (p/parse-string text)
+          findings (map #(error->finding edn-node %) errors)
           {:keys [:findings]} {:findings findings}
           lines (str/split text #"\r?\n")
           diagnostics (vec (keep #(finding->Diagnostic lines %) findings))]
