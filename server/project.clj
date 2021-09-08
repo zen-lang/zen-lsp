@@ -8,7 +8,8 @@
   :scm {:name "git"
         :url "https://github.com/zen-lang/zen-lsp"}
   :dependencies [[org.clojure/clojure "1.10.3"]
-                 [org.eclipse.lsp4j/org.eclipse.lsp4j "0.12.0"]]
+                 [org.eclipse.lsp4j/org.eclipse.lsp4j "0.12.0"]
+                 [zen-lang/zen "0.0.1-SNAPSHOT"]]
   ;; Oldest version JVM to support.
   ;; We don't compile Java classes in this project, but adding this just in case.
   :javac-options ["--release" "8"]
