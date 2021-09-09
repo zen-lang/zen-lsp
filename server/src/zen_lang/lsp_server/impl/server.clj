@@ -112,7 +112,8 @@
         resource (:resource error)
         resource-path (some-> resource name symbol)
         path (cons resource-path (:path error))
-        loc (get-location edn-node path)
+        key? (str/includes? message "unknown key")
+        loc (get-location edn-node path key?)
         finding (assoc loc :message message :level :warning)]
     finding))
 
