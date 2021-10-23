@@ -4,7 +4,8 @@
         org.eclipse.lsp4j/org.eclipse.lsp4j {:mvn/version "0.12.0"}
         zen-lang/zen         {:git/url "https://github.com/zen-lang/zen"
                               :sha "bb7e33ea4232d4d29c4f959f13895f17eedeabb7"}
-        rewrite-clj/rewrite-clj {:mvn/version "1.0.682-alpha"}}
+        rewrite-clj/rewrite-clj {:mvn/version "1.0.682-alpha"}
+        babashka/fs {:mvn/version "0.1.0"}}
 
  :aliases
  {:nrepl

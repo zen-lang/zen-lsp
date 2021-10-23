@@ -1,37 +1,42 @@
 (ns zen-lang.lsp-server.impl.server
   {:no-doc true}
-  (:require [clojure.string :as str]
-            [edamame.core :as e]
-            [rewrite-clj.parser :as p]
-            [zen-lang.lsp-server.impl.location :refer [get-location]]
-            [zen.core :as zen]
-            [zen.store :as store])
-  (:import [java.util.concurrent CompletableFuture]
-           [org.eclipse.lsp4j
-            Diagnostic
-            DiagnosticSeverity
-            DidChangeConfigurationParams
-            DidChangeTextDocumentParams
-            DidChangeWatchedFilesParams
-            DidCloseTextDocumentParams
-            DidOpenTextDocumentParams
-            DidSaveTextDocumentParams
-            ExecuteCommandParams
-            InitializeParams
-            InitializeResult
-            InitializedParams
-            MessageParams
-            MessageType
-            Position
-            PublishDiagnosticsParams
-            Range
-            ServerCapabilities
-            TextDocumentIdentifier
-            TextDocumentContentChangeEvent
-            TextDocumentSyncKind
-            TextDocumentSyncOptions]
-           [org.eclipse.lsp4j.launch LSPLauncher]
-           [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
+  (:require
+   [babashka.fs :as fs]
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [edamame.core :as e]
+   [rewrite-clj.parser :as p]
+   [zen-lang.lsp-server.impl.location :refer [get-location]]
+   [zen.core :as zen]
+   [zen.store :as store])
+  (:import
+   [java.util.concurrent CompletableFuture]
+   [org.eclipse.lsp4j
+    Diagnostic
+    DiagnosticSeverity
+    DidChangeConfigurationParams
+    DidChangeTextDocumentParams
+    DidChangeWatchedFilesParams
+    DidCloseTextDocumentParams
+    DidOpenTextDocumentParams
+    DidSaveTextDocumentParams
+    ExecuteCommandParams
+    InitializeParams
+    InitializeResult
+    InitializedParams
+    MessageParams
+    MessageType
+    Position
+    PublishDiagnosticsParams
+    Range
+    ServerCapabilities
+    TextDocumentIdentifier
+    TextDocumentContentChangeEvent
+    TextDocumentSyncKind
+    TextDocumentSyncOptions]
+   [org.eclipse.lsp4j.launch LSPLauncher]
+   [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
 
 (set! *warn-on-reflection* true)
 
@@ -117,15 +122,16 @@
         finding (assoc loc :message message :level :warning)]
     finding))
 
+(def zen-ctx (zen/new-context {:unsafe true}))
+
 (defn lint! [text uri]
   (when-not (str/ends-with? uri ".calva/output-window/output.calva-repl")
     (let [_lang (uri->lang uri)
           path (-> (java.net.URI. uri)
                    (.getPath))
           edn (e/parse-string text)
-          ctx (zen/new-context {:unsafe true})
-          _ (store/load-ns ctx edn {:zen/file path})
-          errors (:errors @ctx)
+          _ (store/load-ns zen-ctx edn {:zen/file path})
+          errors (:errors @zen-ctx)
           edn-node (p/parse-string text)
           findings (map #(error->finding edn-node %) errors)
           {:keys [:findings]} {:findings findings}
@@ -135,7 +141,9 @@
       (.publishDiagnostics ^LanguageClient @proxy-state
                            (PublishDiagnosticsParams.
                             uri
-                            diagnostics)))))
+                            diagnostics))
+      ;; clear errors for next run
+      (swap! zen-ctx assoc :errors []))))
 
 (deftype LSPTextDocumentService []
   TextDocumentService
@@ -165,18 +173,31 @@
   (^void didChangeConfiguration [_ ^DidChangeConfigurationParams _params])
   (^void didChangeWatchedFiles [_ ^DidChangeWatchedFilesParams _params]))
 
+(defn edn-files-in-dir [dir]
+  (fs/glob dir "*.edn"))
+
+(defn initialize-paths []
+  (let [config-file (fs/file "zen.edn")]
+    (when (fs/exists? config-file)
+      (let [config (edn/read-string (slurp config-file))]
+        (when-let [paths (:paths config)]
+          (let [edn-files (mapcat edn-files-in-dir paths)]
+            (run! #(store/load-ns zen-ctx (edn/read-string (slurp %)) {:zen/file %})
+                  edn-files)))))))
+
 (def server
   (proxy [LanguageServer] []
     (^CompletableFuture initialize [^InitializeParams params]
+
      (CompletableFuture/completedFuture
       (InitializeResult. (doto (ServerCapabilities.)
                            (.setTextDocumentSync (doto (TextDocumentSyncOptions.)
                                                    (.setOpenClose true)
                                                    (.setChange TextDocumentSyncKind/Full)))))))
     (^CompletableFuture initialized [^InitializedParams params]
-     (info "Clj-kondo language server loaded. Please report any issues to https://github.com/borkdude/clj-kondo."))
+     (info "zen-lsp language server loaded."))
     (^CompletableFuture shutdown []
-     (info "Clj-kondo language server shutting down.")
+     (info "zen-lsp language server shutting down.")
      (CompletableFuture/completedFuture 0))
 
     (^void exit []
@@ -197,5 +218,3 @@
     (reset! proxy-state proxy)
     (.startListening launcher)
     (debug "started")))
-
-
