@@ -122,22 +122,28 @@
         finding (assoc loc :message message :level :warning)]
     finding))
 
-(def zen-ctx (zen/new-context {:unsafe true}))
+(defn new-context []
+  (zen/new-context {:unsafe true}))
+
+(defonce zen-ctx (new-context))
 
 (defn clear-errors! []
   (swap! zen-ctx assoc :errors []))
 
-(defn lint! [text uri]
-  (when-not (str/ends-with? uri ".calva/output-window/output.calva-repl")
-    (let [_lang (uri->lang uri)
-          path (-> (java.net.URI. uri)
-                   (.getPath))
-          edn (e/parse-string text)
+(defn file->findings [{:keys [text path]}]
+  (when-not (str/ends-with? path ".calva/output-window/output.calva-repl")
+    (let [edn (e/parse-string text)
           _ (store/load-ns zen-ctx edn {:zen/file path})
           errors (:errors @zen-ctx)
           edn-node (p/parse-string text)
-          findings (map #(error->finding edn-node %) errors)
-          {:keys [:findings]} {:findings findings}
+          findings (map #(error->finding edn-node %) errors)]
+      findings)))
+
+(defn lint! [text uri]
+  (when-not (str/ends-with? uri ".calva/output-window/output.calva-repl")
+    (let [path (-> (java.net.URI. uri)
+                   (.getPath))
+          findings (file->findings {:text text :path path})
           lines (str/split text #"\r?\n")
           diagnostics (vec (keep #(finding->Diagnostic lines %) findings))]
       (debug "publishing diagnostics")
@@ -179,8 +185,8 @@
 (defn edn-files-in-dir [root dir]
   (map fs/file (fs/glob (fs/file root dir) "*.edn")))
 
-(defn initialize-paths [^InitializeParams params]
-  (when-let [root (.getRootPath params)]
+(defn initialize-paths [{:keys [root]}]
+  (when root
     (info "Initializing paths in" root)
     (let [config-file (fs/file root "zen.edn")]
       (when (fs/exists? config-file)
@@ -197,7 +203,7 @@
 (def server
   (proxy [LanguageServer] []
     (^CompletableFuture initialize [^InitializeParams params]
-     (initialize-paths params)
+     (initialize-paths {:root (.getRootPath params)})
      (CompletableFuture/completedFuture
       (InitializeResult. (doto (ServerCapabilities.)
                            (.setTextDocumentSync (doto (TextDocumentSyncOptions.)

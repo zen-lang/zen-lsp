@@ -33,7 +33,7 @@ export function activate(context: ExtensionContext) {
     let serverOptions: ServerOptions = {
         run: {command: 'java', args:['-jar', jarPath] },
         debug: {command: path.join(context.extensionPath, 'debug-srv'), args:[]},
-    }
+    }   
 
     // If the extension is launched in debug mode then the debug server options are used
     // Otherwise the run options are used

@@ -10,16 +10,25 @@
  :aliases
  {:nrepl
   {:extra-paths ["dev"]
-   :extra-deps  {cider/cider-nrepl {:mvn/version "LATEST"}}
+   :extra-deps  {cider/cider-nrepl #_:clj-kondo/ignore {:mvn/version "LATEST"}}
 
    :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]}
 
-  :test {:extra-paths ["test"]
-         :extra-deps {healthsamurai/matcho {:mvn/version "0.3.7"}}
-         :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]}
+  :test-deps {:extra-paths ["test"]
+              :extra-deps {healthsamurai/matcho {:mvn/version "0.3.7"}}
+              :jvm-opts ^:replace ["-XX:-OmitStackTraceInFastThrow"]}
+
+  :test
+  {:extra-paths ["test"]
+   :extra-deps {io.github.cognitect-labs/test-runner
+                {:git/tag "v0.5.0" :git/sha "b3fd0d2"}}
+   :main-opts ["-m" "cognitect.test-runner"]
+   :exec-fn cognitect.test-runner.api/test}
 
   :kaocha
   {:extra-deps {lambdaisland/kaocha  {:mvn/version "1.0-612"}}
    :extra-paths ["test"]
    :jvm-opts    ^:replace ["-XX:-OmitStackTraceInFastThrow"]
-   :main-opts   ["-m" "kaocha.runner" "--config-file" "test/test.edn"]}}}
+   :main-opts   ["-m" "kaocha.runner" "--config-file" "test/test.edn"]}
+
+  }}

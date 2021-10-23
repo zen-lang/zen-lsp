@@ -23,6 +23,9 @@
                              :task     (let [java-version (:err (sh "java" "-version"))]
                                          (assert (str/includes? java-version "1.8.0") "Must use Java 1.8.0"))}
 
+         server-test        {:doc "Run tests"
+                             :task (clojure {:dir "server"} "-M:test")}
+
          -uberjar           {:task    (str (fs/path "server/target" (str "lsp-server-"
                                                                          version
                                                                          "-standalone.jar")))}

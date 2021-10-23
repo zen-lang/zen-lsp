@@ -1,0 +1,9 @@
+{ns foo
+ import #{bar}
+
+ schema
+ {:zen/tags #{zen/schema}
+  :type zen/map
+  :keys {:bar {:confirms #{bar/schema}} ;; No errors expected
+         :baz {:confirms #{baz/schema}} ;; Expected error: "Expected type of 'set, got symbol"
+         }}}
