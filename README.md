@@ -15,9 +15,13 @@ Run `bb tasks` to get a full overview of how to build this project.
 
 ### Server
 
+To test the server, run:
+
+    bb server:test
+
 To build the server uberjar, run:
 
-    bb build-server
+    bb server:build
 
 ### VSCode extension
 
