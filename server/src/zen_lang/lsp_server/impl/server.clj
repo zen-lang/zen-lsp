@@ -124,6 +124,9 @@
 
 (def zen-ctx (zen/new-context {:unsafe true}))
 
+(defn clear-errors! []
+  (swap! zen-ctx assoc :errors []))
+
 (defn lint! [text uri]
   (when-not (str/ends-with? uri ".calva/output-window/output.calva-repl")
     (let [_lang (uri->lang uri)
@@ -143,7 +146,7 @@
                             uri
                             diagnostics))
       ;; clear errors for next run
-      (swap! zen-ctx assoc :errors []))))
+      (clear-errors!))))
 
 (deftype LSPTextDocumentService []
   TextDocumentService
@@ -173,22 +176,28 @@
   (^void didChangeConfiguration [_ ^DidChangeConfigurationParams _params])
   (^void didChangeWatchedFiles [_ ^DidChangeWatchedFilesParams _params]))
 
-(defn edn-files-in-dir [dir]
-  (fs/glob dir "*.edn"))
+(defn edn-files-in-dir [root dir]
+  (map fs/file (fs/glob (fs/file root dir) "*.edn")))
 
-(defn initialize-paths []
-  (let [config-file (fs/file "zen.edn")]
-    (when (fs/exists? config-file)
-      (let [config (edn/read-string (slurp config-file))]
-        (when-let [paths (:paths config)]
-          (let [edn-files (mapcat edn-files-in-dir paths)]
-            (run! #(store/load-ns zen-ctx (edn/read-string (slurp %)) {:zen/file %})
-                  edn-files)))))))
+(defn initialize-paths [^InitializeParams params]
+  (when-let [root (.getRootPath params)]
+    (info "Initializing paths in" root)
+    (let [config-file (fs/file root "zen.edn")]
+      (when (fs/exists? config-file)
+        (let [config (edn/read-string (slurp config-file))]
+          (when-let [paths (:paths config)]
+            (let [edn-files (mapcat #(edn-files-in-dir root %) paths)]
+              (run! #(do
+                       (info "Processing zen code in" %)
+                       (store/load-ns zen-ctx (edn/read-string (slurp %))
+                                      {:zen/file %}))
+                    edn-files)
+              (clear-errors!))))))))
 
 (def server
   (proxy [LanguageServer] []
     (^CompletableFuture initialize [^InitializeParams params]
-
+     (initialize-paths params)
      (CompletableFuture/completedFuture
       (InitializeResult. (doto (ServerCapabilities.)
                            (.setTextDocumentSync (doto (TextDocumentSyncOptions.)
