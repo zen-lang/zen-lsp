@@ -4,7 +4,10 @@
             [rewrite-clj.zip :as z]))
 
 (defn get-in [zloc path]
-  (reduce z/get zloc path))
+  (reduce (fn [zloc k]
+            (if zloc
+              (z/get zloc k)
+              (reduced nil))) zloc path))
 
 (defn get-location
   ([edn-node path] (get-location edn-node path false))

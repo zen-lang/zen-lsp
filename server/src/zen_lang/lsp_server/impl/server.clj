@@ -139,7 +139,7 @@
     findings))
 
 (defn lint! [text uri]
-  (when-not (str/ends-with? uri ".calva/output-window/output.calva-repl")
+  (when (str/ends-with? uri ".edn")
     (let [path (-> (java.net.URI. uri)
                    (.getPath))
           findings (file->findings {:text text :path path})
