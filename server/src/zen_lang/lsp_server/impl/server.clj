@@ -131,13 +131,12 @@
   (swap! zen-ctx assoc :errors []))
 
 (defn file->findings [{:keys [text path]}]
-  (when-not (str/ends-with? path ".calva/output-window/output.calva-repl")
-    (let [edn (e/parse-string text)
-          _ (store/load-ns zen-ctx edn {:zen/file path})
-          errors (:errors @zen-ctx)
-          edn-node (p/parse-string text)
-          findings (map #(error->finding edn-node %) errors)]
-      findings)))
+  (let [edn (e/parse-string text)
+        _ (store/load-ns zen-ctx edn {:zen/file path})
+        errors (:errors @zen-ctx)
+        edn-node (p/parse-string text)
+        findings (map #(error->finding edn-node %) errors)]
+    findings))
 
 (defn lint! [text uri]
   (when-not (str/ends-with? uri ".calva/output-window/output.calva-repl")
@@ -192,13 +191,7 @@
       (when (fs/exists? config-file)
         (let [config (edn/read-string (slurp config-file))]
           (when-let [paths (:paths config)]
-            (let [edn-files (mapcat #(edn-files-in-dir root %) paths)]
-              (run! #(do
-                       (info "Processing zen code in" %)
-                       (store/load-ns zen-ctx (edn/read-string (slurp %))
-                                      {:zen/file %}))
-                    edn-files)
-              (clear-errors!))))))))
+            (swap! zen-ctx assoc :paths (mapv #(str (fs/file root %)) paths))))))))
 
 (def server
   (proxy [LanguageServer] []
