@@ -5,6 +5,47 @@ This repo contains the code for:
 - the zen-lsp-server
 - the VSCode extension which bundles the server and client.
 
+## Install
+
+### Manual
+
+To install the zen-lsp server on Unix-like systems, you can run the `install`
+script from this repository:
+
+```
+$ curl -sLO https://raw.githubusercontent.com/zen-lang/zen-lsp/main/install
+$ chmod +x install
+$ ./install
+```
+
+This will download the zen-lsp uberjar and place it in `~/.zen-lsp`. It will
+also create a `zen-lsp` script inside `/usr/local/bin`.
+
+### Emacs
+
+First run the manual installation of the zen-lsp uberjar.  Ensure that the
+`lsp-mode` package is installed. Then place this in your `init.el`:
+
+``` elisp
+(require 'lsp-mode)
+(lsp-register-client
+ (make-lsp-client :new-connection (lsp-stdio-connection "zen-lsp")
+                  :major-modes '(clojure-mode)
+                  :add-on? t
+                  :activation-fn (lsp-activate-on "clojure")
+                  :server-id 'zen-lang))
+```
+
+Upon opening a zen `.edn` file, you should start seeing lint warnings.
+
+### VSCode
+
+Download the `.vsix` file from
+[releases](https://github.com/zen-lang/zen-lsp/releases) and install it in
+VSCode:
+
+    Extensions > Install from VSIX...
+
 ## Build
 
 To run build tasks in this project, use [babashka](https://babashka.org/). You
