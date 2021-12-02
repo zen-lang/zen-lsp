@@ -36,8 +36,6 @@ First run the manual installation of the zen-lsp uberjar.  Ensure that the
                   :server-id 'zen-lang))
 ```
 
-Upon opening a zen `.edn` file, you should start seeing lint warnings.
-
 ### VSCode
 
 Download the `.vsix` file from
