@@ -34,7 +34,7 @@
          vscode-server      {:doc     "Copies lsp server jar to vscode extension"
                              :depends [uberjar server:build]
                              :task    (fs/copy (fs/file "server" uberjar)
-                                               (fs/path "vscode-extension" "zen-lsp-standalone.jar")
+                                               (fs/path "vscode-extension" "zen-lsp-server-standalone.jar")
                                                {:replace-existing true})}
 
          vscode-version     {:doc     "Prepares package.json with up to date clj-kondo version"

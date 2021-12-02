@@ -29,7 +29,7 @@ export function activate(context: ExtensionContext) {
     // The debug options for the server
     // --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
     let debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
-    let jarPath = path.join(context.extensionPath, 'zen-lsp-standalone.jar');
+    let jarPath = path.join(context.extensionPath, 'zen-lsp-server-standalone.jar');
     let serverOptions: ServerOptions = {
         run: {command: 'java', args:['-jar', jarPath] },
         debug: {command: path.join(context.extensionPath, 'debug-srv'), args:[]},

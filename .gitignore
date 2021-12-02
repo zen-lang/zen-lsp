@@ -1,5 +1,4 @@
 .cpcache
-.clj-kondo/.cache
-.lsp/.cache
+.cache
 .calva
 .portal

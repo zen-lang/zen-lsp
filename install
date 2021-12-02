@@ -7,7 +7,7 @@ mkdir -p /tmp/lsp-installer
 pushd /tmp/lsp-installer > /dev/null
 curl -sLO https://github.com/zen-lang/zen-lsp/releases/download/v0.0.1/zen-lsp-server-0.0.1-standalone.jar
 mv zen-lsp-server-0.0.1-standalone.jar ~/.zen-lsp/zen-lsp-standalone.jar
-echo '#/usr/bin/env/bash\n\njava -jar ~/.zen-lsp/zen-lsp-standalone.jar' > zen-lsp
+echo -e "#/usr/bin/env/bash\n\njava -jar ~/.zen-lsp/zen-lsp-standalone.jar" > zen-lsp
 chmod +x zen-lsp
 mv zen-lsp /usr/local/bin
 popd > /dev/null
