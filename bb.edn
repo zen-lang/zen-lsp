@@ -11,6 +11,9 @@
                                 (def version "0.0.1"))
          :leave             (print-public-task :leave)
 
+         clean              {:doc      "Cleans artifacts"
+                             :task     (fs/delete-tree "server/target")}
+
          java1.8            {:doc      "Asserts that we are using java 1.8"
                              :requires ([clojure.java.shell :refer [sh]]
                                         [clojure.string :as str])

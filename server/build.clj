@@ -20,4 +20,5 @@
                          :src-dirs ["src"]
                          :class-dir class-dir}))
   (b/uber (merge opts {:class-dir class-dir
-                       :basis basis})))
+                       :basis basis
+                       :main 'zen-lang.lsp-server.main})))
