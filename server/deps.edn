@@ -31,4 +31,8 @@
    :jvm-opts    ^:replace ["-XX:-OmitStackTraceInFastThrow"]
    :main-opts   ["-m" "kaocha.runner" "--config-file" "test/test.edn"]}
 
+ :build ;; added by neil
+ {:deps {io.github.clojure/tools.build {:git/tag "v0.6.8" :git/sha "d79ae84"}}
+  :ns-default build}
+
   }}

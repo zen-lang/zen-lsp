@@ -38,6 +38,11 @@
    [org.eclipse.lsp4j.launch LSPLauncher]
    [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
 
+
+
+
+
+
 (set! *warn-on-reflection* true)
 
 (defonce proxy-state (atom nil))
@@ -62,7 +67,7 @@
 (defn info [& msgs]
   (apply log! :info msgs))
 
-(def debug? false)
+(def debug? true)
 
 (defn debug [& msgs]
   (when debug?
@@ -120,6 +125,8 @@
         key? (str/includes? message "unknown key")
         loc (get-location edn-node path key?)
         finding (assoc loc :message message :level :warning)]
+    (debug :error error)
+    (debug :finding finding)
     finding))
 
 (defn new-context []
@@ -139,6 +146,7 @@
     findings))
 
 (defn lint! [text uri]
+  ;; TODO: more checks if it's really a zen file
   (when (str/ends-with? uri ".edn")
     (let [path (-> (java.net.URI. uri)
                    (.getPath))
