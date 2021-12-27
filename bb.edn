@@ -47,16 +47,16 @@
 
          vscode-package     {:doc    "Builds vscode package"
                              :depends [vscode-server vscode-version]
-                             :task    (do (shell {:dir "vscode-extension"} "npx vsce package")
-                                          (str (fs/file "vscode-extension"
-                                                        (format "zen-lsp-%s.vsix" version))))}
+                             :task    (do
+                                        (shell {:dir "vscode-extension"} "npm install")
+                                        (shell {:dir "vscode-extension"} "npx vsce package")
+                                        (str (fs/file "vscode-extension"
+                                                      (format "zen-lsp-%s.vsix" version))))}
 
          upload-assets      {:doc    "Uploads jar and vsix to Github"
                              :depends [server:build vscode-server vscode-version vscode-package]
                              :requires ([upload-release :as ur])
-                             :task    (do (println "Uploading" server:build)
-                                          (ur/release server:build version)
-                                          (println "Uploading" vscode-package)
+                             :task    (do (ur/release server:build version)
                                           (ur/release vscode-package version))}
 
          vscode-publish     {:doc     "Publishes vscode extension to marketplace"

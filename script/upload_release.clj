@@ -18,6 +18,7 @@
         branch (current-branch)]
     (if (and ght (contains? #{"master" "main"} branch))
       (do (assert file "File name must be provided")
+          (println "Uploading" file)
           (ghr/overwrite-asset {:org "zen-lang"
                                 :repo "zen-lsp"
                                 :file file
