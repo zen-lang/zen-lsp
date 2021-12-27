@@ -8,6 +8,7 @@
                                     (when-not private
                                       (println (case k :enter "☐" "✓") name))))
                                 (def version "0.0.2-SNAPSHOT"))
+         :enter             (print-public-task :enter)
          :leave             (print-public-task :leave)
 
          clean              {:doc      "Cleans artifacts"
@@ -47,12 +48,15 @@
          vscode-package     {:doc    "Builds vscode package"
                              :depends [vscode-server vscode-version]
                              :task    (do (shell {:dir "vscode-extension"} "npx vsce package")
-                                          (str (fs/file "vscode-extension" (format "zen-lsp-%.vsix"))))}
+                                          (str (fs/file "vscode-extension"
+                                                        (format "zen-lsp-%s.vsix" version))))}
 
          upload-assets      {:doc    "Uploads jar and vsix to Github"
                              :depends [server:build vscode-server vscode-version vscode-package]
                              :requires ([upload-release :as ur])
-                             :task    (do (ur/release server:build version)
+                             :task    (do (println "Uploading" server:build)
+                                          (ur/release server:build version)
+                                          (println "Uploading" vscode-package)
                                           (ur/release vscode-package version))}
 
          vscode-publish     {:doc     "Publishes vscode extension to marketplace"
