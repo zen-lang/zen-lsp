@@ -1,7 +1,7 @@
 {:paths ["script"]
  :deps  {borkdude/gh-release-artifact
          {:git/url "https://github.com/borkdude/gh-release-artifact"
-          :sha     "f34f3e382e6a0ef7f52748b2f27eb681f799a822"}}
+          :sha     "a83ee8da47d56a80b6380cbb6b4b9274048067bd"}}
  :tasks {:requires          ([babashka.fs :as fs])
          :init              (do (defn print-public-task [k]
                                   (let [{:keys [:private :name]} (current-task)]
