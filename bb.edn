@@ -46,7 +46,7 @@
 
          vscode-package     {:doc    "Builds vscode package"
                              :depends [vscode-server vscode-version]
-                             :task    (do (shell {:dir "vscode-extension"} "vsce package")
+                             :task    (do (shell {:dir "vscode-extension"} "npx vsce package")
                                           (str (fs/file "vscode-extension" (format "zen-lsp-%.vsix"))))}
 
          upload-assets      {:doc    "Uploads jar and vsix to Github"
@@ -57,12 +57,12 @@
 
          vscode-publish     {:doc     "Publishes vscode extension to marketplace"
                              :depends [vscode-server vscode-version]
-                             :task    (shell {:dir "vscode-extension"} "vsce publish")}
+                             :task    (shell {:dir "vscode-extension"} "npx vsce publish")}
 
          ovsx-publish       {:doc     "Publishes vscode extension to ovsx thing"
                              :depends [vscode-server vscode-version]
                              :task    (shell {:dir "vscode-extension"}
-                                             (str "ovsx publish --pat "
+                                             (str "npx ovsx publish --pat "
                                                   (System/getenv "OVSX_TOKEN")))}
 
          publish            {:doc     "The mother of all tasks: publishes everything needed for new release"
