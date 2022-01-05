@@ -7,7 +7,7 @@
                                   (let [{:keys [:private :name]} (current-task)]
                                     (when-not private
                                       (println (case k :enter "☐" "✓") name))))
-                                (def version "0.0.2-SNAPSHOT"))
+                                (def version "0.0.2"))
          :enter             (print-public-task :enter)
          :leave             (print-public-task :leave)
 
@@ -63,11 +63,5 @@
                              :depends [vscode-server vscode-version]
                              :task    (shell {:dir "vscode-extension"} "npx vsce publish")}
 
-         ovsx-publish       {:doc     "Publishes vscode extension to ovsx thing"
-                             :depends [vscode-server vscode-version]
-                             :task    (shell {:dir "vscode-extension"}
-                                             (str "npx ovsx publish --pat "
-                                                  (System/getenv "OVSX_TOKEN")))}
-
          publish            {:doc     "The mother of all tasks: publishes everything needed for new release"
-                             :depends [upload-assets #_#_ vscode-publish ovsx-publish]}}}
+                             :depends [upload-assets vscode-publish]}}}
