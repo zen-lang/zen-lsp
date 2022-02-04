@@ -172,9 +172,13 @@
 (defn completions [^org.eclipse.lsp4j.CompletionParams params]
   (let [_td ^TextDocumentIdentifier (.getTextDocument params)]
     ;; (debug "Publishing completions")
-    (CompletableFuture/completedFuture
-     1 #_(doto (java.util.ArrayList.)
-       (.add (org.eclipse.lsp4j.CompletionItem. "hello"))))))
+    #_(CompletableFuture/completedFuture
+       [(org.eclipse.lsp4j.CompletionItem. "hello")])
+    (CompletableFuture/supplyAsync
+     (reify java.util.function.Supplier
+       (get [_this]
+         [(org.eclipse.lsp4j.CompletionItem. "hello")]))
+     )))
 
 #_(doto
       #_(.setInsertText "yay")
@@ -208,7 +212,13 @@
   (^void didClose [_ ^DidCloseTextDocumentParams _params])
 
   (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
-   (completions params)))
+   (CompletableFuture/supplyAsync
+    (reify java.util.function.Supplier
+      (get [_this]
+        (debug :hello)
+        [(org.eclipse.lsp4j.CompletionItem. "hello")]))
+    )
+   #_(completions params)))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
