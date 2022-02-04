@@ -66,11 +66,7 @@ To build the server uberjar, run:
 
 #### Local development
 
-To develop the VSCode extension locally, first ensure that the server uberjar is copied into the `vscode-extension` directory:
-
-     bb vscode-server
-
-Then enter the extension directory:
+Enter the extension directory:
 
      cd vscode-extension
 
