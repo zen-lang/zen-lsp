@@ -79,7 +79,7 @@ Open VSCode:
     code .
 
 Then hit `F5 (Start Debugging)` to run the extension. Edit a zen-lang file
-(`.edn`) and you will get diagnostic feedback.
+(e.g. `test-resources/test-project/zrc/foo.edn`) and you will get diagnostic feedback.
 
 #### VSIX package
 
