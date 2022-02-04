@@ -170,15 +170,11 @@
       (clear-errors!))))
 
 (defn completions [^org.eclipse.lsp4j.CompletionParams params]
-  (let [position (.getPosition params)
-        td ^TextDocumentIdentifier (.getTextDocument params)
-        td-uri (.getUri td)
-        line (.getLine position)
-        col (.getCharacter position)]
-    (debug "Publishing completions")
+  (let [_td ^TextDocumentIdentifier (.getTextDocument params)]
+    ;; (debug "Publishing completions")
     (CompletableFuture/completedFuture
-     (Either/forLeft
-      [(org.eclipse.lsp4j.CompletionItem. "hello")]))))
+     1 #_(doto (java.util.ArrayList.)
+       (.add (org.eclipse.lsp4j.CompletionItem. "hello"))))))
 
 #_(doto
       #_(.setInsertText "yay")
