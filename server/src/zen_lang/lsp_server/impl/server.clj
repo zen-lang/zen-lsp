@@ -36,7 +36,8 @@
     TextDocumentSyncKind
     TextDocumentSyncOptions]
    [org.eclipse.lsp4j.launch LSPLauncher]
-   [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
+   [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]
+   [org.eclipse.lsp4j.jsonrpc.messages Either]))
 
 
 
@@ -134,16 +135,23 @@
 
 (defonce zen-ctx (new-context))
 
+(comment
+  zen-ctx
+  )
+
 (defn clear-errors! []
   (swap! zen-ctx assoc :errors []))
 
 (defn file->findings [{:keys [text path]}]
-  (let [edn (e/parse-string text)
-        _ (store/load-ns zen-ctx edn {:zen/file path})
-        errors (:errors @zen-ctx)
-        edn-node (p/parse-string text)
-        findings (map #(error->finding edn-node %) errors)]
-    findings))
+  (if-let [edn (try (e/parse-string text)
+                    (catch Exception _ nil))]
+    (let [_ (store/load-ns zen-ctx edn {:zen/file path})
+          errors (:errors @zen-ctx)
+          edn-node (p/parse-string text)
+          findings (map #(error->finding edn-node %) errors)]
+      findings)
+    (do (debug "Error parsing")
+        nil)))
 
 (defn lint! [text uri]
   ;; TODO: more checks if it's really a zen file
@@ -160,6 +168,26 @@
                             diagnostics))
       ;; clear errors for next run
       (clear-errors!))))
+
+(defn completions [^org.eclipse.lsp4j.CompletionParams params]
+  (let [position (.getPosition params)
+        td ^TextDocumentIdentifier (.getTextDocument params)
+        td-uri (.getUri td)
+        line (.getLine position)
+        col (.getCharacter position)]
+    (debug "Publishing completions")
+    (CompletableFuture/completedFuture
+     (Either/forLeft
+      [(org.eclipse.lsp4j.CompletionItem. "hello")]))))
+
+#_(doto
+      #_(.setInsertText "yay")
+      #_(.setKind org.eclipse.lsp4j.CompletionItemKind/Text)
+      #_(.setData "hello2")
+      #_(doto (.setTextEdit (Either/forLeft  (org.eclipse.lsp4j.TextEdit.
+                                              (Range. (Position. 0 10)
+                                                      (Position. 0 12))
+                                              "heloo")))))
 
 (deftype LSPTextDocumentService []
   TextDocumentService
@@ -181,7 +209,10 @@
 
   (^void didSave [_ ^DidSaveTextDocumentParams _params])
 
-  (^void didClose [_ ^DidCloseTextDocumentParams _params]))
+  (^void didClose [_ ^DidCloseTextDocumentParams _params])
+
+  (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
+   (completions params)))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
@@ -209,7 +240,8 @@
       (InitializeResult. (doto (ServerCapabilities.)
                            (.setTextDocumentSync (doto (TextDocumentSyncOptions.)
                                                    (.setOpenClose true)
-                                                   (.setChange TextDocumentSyncKind/Full)))))))
+                                                   (.setChange TextDocumentSyncKind/Full)))
+                           (.setCompletionProvider (org.eclipse.lsp4j.CompletionOptions. true [":" "/"]))))))
     (^CompletableFuture initialized [^InitializedParams params]
      (info "zen-lsp language server loaded."))
     (^CompletableFuture shutdown []
