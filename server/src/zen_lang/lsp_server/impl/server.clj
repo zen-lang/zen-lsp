@@ -172,7 +172,10 @@
 (defn completions [^org.eclipse.lsp4j.CompletionParams params]
   (let [_td ^TextDocumentIdentifier (.getTextDocument params)]
     (CompletableFuture/completedFuture
-       [(org.eclipse.lsp4j.CompletionItem. "hello")])))
+     (do (debug :completions)
+         [(org.eclipse.lsp4j.CompletionItem. "hello")
+          (org.eclipse.lsp4j.CompletionItem. "foo/bar")
+          (org.eclipse.lsp4j.CompletionItem. "zen-lsp-rocks!")]))))
 
 (deftype LSPTextDocumentService []
   TextDocumentService
@@ -197,7 +200,10 @@
   (^void didClose [_ ^DidCloseTextDocumentParams _params])
 
   (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
-   (completions params)))
+   (completions params))
+
+  (^CompletableFuture resolveCompletionItem [_ ^org.eclipse.lsp4j.CompletionItem item]
+   (CompletableFuture/completedFuture item)))
 
 (deftype LSPWorkspaceService []
   WorkspaceService

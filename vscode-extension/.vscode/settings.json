@@ -2,5 +2,8 @@
 	"editor.insertSpaces": false,
 	"tslint.enable": true,
 	"typescript.tsc.autoDetect": "off",
-	"typescript.preferences.quoteStyle": "single"
+	"typescript.preferences.quoteStyle": "single",
+	"java.completion.enabled": false,
+	"java.debug.settings.enableRunDebugCodeLens": false,
+	"java.test.editor.enableShortcuts": false
 }
