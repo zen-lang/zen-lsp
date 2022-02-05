@@ -171,23 +171,8 @@
 
 (defn completions [^org.eclipse.lsp4j.CompletionParams params]
   (let [_td ^TextDocumentIdentifier (.getTextDocument params)]
-    ;; (debug "Publishing completions")
-    #_(CompletableFuture/completedFuture
-       [(org.eclipse.lsp4j.CompletionItem. "hello")])
-    (CompletableFuture/supplyAsync
-     (reify java.util.function.Supplier
-       (get [_this]
-         [(org.eclipse.lsp4j.CompletionItem. "hello")]))
-     )))
-
-#_(doto
-      #_(.setInsertText "yay")
-      #_(.setKind org.eclipse.lsp4j.CompletionItemKind/Text)
-      #_(.setData "hello2")
-      #_(doto (.setTextEdit (Either/forLeft  (org.eclipse.lsp4j.TextEdit.
-                                              (Range. (Position. 0 10)
-                                                      (Position. 0 12))
-                                              "heloo")))))
+    (CompletableFuture/completedFuture
+       [(org.eclipse.lsp4j.CompletionItem. "hello")])))
 
 (deftype LSPTextDocumentService []
   TextDocumentService
@@ -212,13 +197,7 @@
   (^void didClose [_ ^DidCloseTextDocumentParams _params])
 
   (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
-   (CompletableFuture/supplyAsync
-    (reify java.util.function.Supplier
-      (get [_this]
-        (debug :hello)
-        [(org.eclipse.lsp4j.CompletionItem. "hello")]))
-    )
-   #_(completions params)))
+   (completions params)))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
@@ -272,3 +251,8 @@
     (reset! proxy-state proxy)
     (.startListening launcher)
     (debug "started")))
+
+(Thread/setDefaultUncaughtExceptionHandler  (proxy [Thread$UncaughtExceptionHandler] []
+                                              (uncaughtException [t ^Exception e]
+                                                (debug "Throwable: " (.getMessage e))
+                                                )))
