@@ -200,10 +200,7 @@
   (^void didClose [_ ^DidCloseTextDocumentParams _params])
 
   (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
-   (completions params))
-
-  (^CompletableFuture resolveCompletionItem [_ ^org.eclipse.lsp4j.CompletionItem item]
-   (CompletableFuture/completedFuture item)))
+   (completions params)))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
@@ -232,7 +229,7 @@
                            (.setTextDocumentSync (doto (TextDocumentSyncOptions.)
                                                    (.setOpenClose true)
                                                    (.setChange TextDocumentSyncKind/Full)))
-                           (.setCompletionProvider (org.eclipse.lsp4j.CompletionOptions. true [":" "/"]))))))
+                           (.setCompletionProvider (org.eclipse.lsp4j.CompletionOptions. false [":" "/"]))))))
     (^CompletableFuture initialized [^InitializedParams params]
      (info "zen-lsp language server loaded."))
     (^CompletableFuture shutdown []
