@@ -7,7 +7,7 @@
                                   (let [{:keys [:private :name]} (current-task)]
                                     (when-not private
                                       (println (case k :enter "☐" "✓") name))))
-                                (def version "0.0.2"))
+                                (def version "0.0.3"))
          :enter             (print-public-task :enter)
          :leave             (print-public-task :leave)
 
@@ -60,7 +60,7 @@
                                           (ur/release vscode-package version))}
 
          vscode-publish     {:doc     "Publishes vscode extension to marketplace"
-                             :depends [vscode-server vscode-version]
+                             :depends [vscode-package]
                              :task    (shell {:dir "vscode-extension"} "npx vsce publish")}
 
          publish            {:doc     "The mother of all tasks: publishes everything needed for new release"
