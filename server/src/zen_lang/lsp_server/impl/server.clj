@@ -3,7 +3,6 @@
   (:require
    [babashka.fs :as fs]
    [clojure.edn :as edn]
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [edamame.core :as e]
    [rewrite-clj.parser :as p]
@@ -36,8 +35,7 @@
     TextDocumentSyncKind
     TextDocumentSyncOptions]
    [org.eclipse.lsp4j.launch LSPLauncher]
-   [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]
-   [org.eclipse.lsp4j.jsonrpc.messages Either]))
+   [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
 
 
 
@@ -135,10 +133,6 @@
 
 (defonce zen-ctx (new-context))
 
-(comment
-  zen-ctx
-  )
-
 (defn clear-errors! []
   (swap! zen-ctx assoc :errors []))
 
@@ -170,12 +164,13 @@
       (clear-errors!))))
 
 (defn completions [^org.eclipse.lsp4j.CompletionParams params]
-  (let [_td ^TextDocumentIdentifier (.getTextDocument params)]
+  (let [_td ^TextDocumentIdentifier (.getTextDocument params)
+        namespaces (keys (:ns @zen-ctx))
+        symbols (keys (:symbols @zen-ctx))
+        completions (map #(org.eclipse.lsp4j.CompletionItem. %)
+                         (map str (concat namespaces symbols)))]
     (CompletableFuture/completedFuture
-     (do (debug :completions)
-         [(org.eclipse.lsp4j.CompletionItem. "hello")
-          (org.eclipse.lsp4j.CompletionItem. "foo/bar")
-          (org.eclipse.lsp4j.CompletionItem. "zen-lsp-rocks!")]))))
+     (vec completions))))
 
 (deftype LSPTextDocumentService []
   TextDocumentService
@@ -255,7 +250,7 @@
     (.startListening launcher)
     (debug "started")))
 
-(Thread/setDefaultUncaughtExceptionHandler  (proxy [Thread$UncaughtExceptionHandler] []
-                                              (uncaughtException [t ^Exception e]
-                                                (debug "Throwable: " (.getMessage e))
-                                                )))
+(Thread/setDefaultUncaughtExceptionHandler
+ (proxy [Thread$UncaughtExceptionHandler] []
+   (uncaughtException [t ^Exception e]
+     (debug "Throwable: " (.getMessage e)))))
