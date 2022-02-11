@@ -16,6 +16,7 @@
         file (first args)
         version (second args)
         branch (current-branch)]
+    (prn :version version)
     (if (and ght (contains? #{"master" "main"} branch))
       (do (assert file "File name must be provided")
           (println "Uploading" file)

@@ -2,3 +2,4 @@
 .cache
 .calva
 .portal
+server/test-resources/test-project/.vscode
