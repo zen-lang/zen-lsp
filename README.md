@@ -66,11 +66,7 @@ To build the server uberjar, run:
 
 #### Local development
 
-To develop the VSCode extension locally, first ensure that the server uberjar is copied into the `vscode-extension` directory:
-
-     bb vscode-server
-
-Then enter the extension directory:
+Enter the extension directory:
 
      cd vscode-extension
 
@@ -83,7 +79,7 @@ Open VSCode:
     code .
 
 Then hit `F5 (Start Debugging)` to run the extension. Edit a zen-lang file
-(`.edn`) and you will get diagnostic feedback.
+(e.g. `test-resources/test-project/zrc/foo.edn`) and you will get diagnostic feedback.
 
 #### VSIX package
 

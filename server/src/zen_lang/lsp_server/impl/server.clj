@@ -3,7 +3,6 @@
   (:require
    [babashka.fs :as fs]
    [clojure.edn :as edn]
-   [clojure.java.io :as io]
    [clojure.string :as str]
    [edamame.core :as e]
    [rewrite-clj.parser :as p]
@@ -138,12 +137,15 @@
   (swap! zen-ctx assoc :errors []))
 
 (defn file->findings [{:keys [text path]}]
-  (let [edn (e/parse-string text)
-        _ (store/load-ns zen-ctx edn {:zen/file path})
-        errors (:errors @zen-ctx)
-        edn-node (p/parse-string text)
-        findings (map #(error->finding edn-node %) errors)]
-    findings))
+  (if-let [edn (try (e/parse-string text)
+                    (catch Exception _ nil))]
+    (let [_ (store/load-ns zen-ctx edn {:zen/file path})
+          errors (:errors @zen-ctx)
+          edn-node (p/parse-string text)
+          findings (map #(error->finding edn-node %) errors)]
+      findings)
+    (do (debug "Error parsing")
+        nil)))
 
 (defn lint! [text uri]
   ;; TODO: more checks if it's really a zen file
@@ -160,6 +162,15 @@
                             diagnostics))
       ;; clear errors for next run
       (clear-errors!))))
+
+(defn completions [^org.eclipse.lsp4j.CompletionParams params]
+  (let [_td ^TextDocumentIdentifier (.getTextDocument params)
+        namespaces (keys (:ns @zen-ctx))
+        symbols (keys (:symbols @zen-ctx))
+        completions (map #(org.eclipse.lsp4j.CompletionItem. %)
+                         (map str (concat namespaces symbols)))]
+    (CompletableFuture/completedFuture
+     (vec completions))))
 
 (deftype LSPTextDocumentService []
   TextDocumentService
@@ -181,7 +192,10 @@
 
   (^void didSave [_ ^DidSaveTextDocumentParams _params])
 
-  (^void didClose [_ ^DidCloseTextDocumentParams _params]))
+  (^void didClose [_ ^DidCloseTextDocumentParams _params])
+
+  (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
+   (completions params)))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
@@ -209,7 +223,8 @@
       (InitializeResult. (doto (ServerCapabilities.)
                            (.setTextDocumentSync (doto (TextDocumentSyncOptions.)
                                                    (.setOpenClose true)
-                                                   (.setChange TextDocumentSyncKind/Full)))))))
+                                                   (.setChange TextDocumentSyncKind/Full)))
+                           (.setCompletionProvider (org.eclipse.lsp4j.CompletionOptions. false [":" "/"]))))))
     (^CompletableFuture initialized [^InitializedParams params]
      (info "zen-lsp language server loaded."))
     (^CompletableFuture shutdown []
@@ -234,3 +249,8 @@
     (reset! proxy-state proxy)
     (.startListening launcher)
     (debug "started")))
+
+(Thread/setDefaultUncaughtExceptionHandler
+ (proxy [Thread$UncaughtExceptionHandler] []
+   (uncaughtException [t ^Exception e]
+     (debug "Throwable: " (.getMessage e)))))
