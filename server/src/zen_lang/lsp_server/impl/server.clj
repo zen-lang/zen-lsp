@@ -164,7 +164,11 @@
       (clear-errors!))))
 
 (defn completions [^org.eclipse.lsp4j.CompletionParams params]
-  (let [_td ^TextDocumentIdentifier (.getTextDocument params)
+  (let [_ (def p params)
+        _td ^TextDocumentIdentifier (.getTextDocument params)
+        p (.getPosition params)
+        line (.getLine p)
+        col (.getCharacter p)
         namespaces (keys (:ns @zen-ctx))
         symbols (keys (:symbols @zen-ctx))
         completions (map #(org.eclipse.lsp4j.CompletionItem. %)
