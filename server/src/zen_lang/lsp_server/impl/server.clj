@@ -44,6 +44,11 @@
 
 (set! *warn-on-reflection* true)
 
+(defn new-context []
+  (zen/new-context {:unsafe true}))
+
+(defonce zen-ctx (new-context))
+
 (defonce proxy-state (atom nil))
 
 (defn log! [level & msg]
@@ -128,10 +133,6 @@
     (debug :finding finding)
     finding))
 
-(defn new-context []
-  (zen/new-context {:unsafe true}))
-
-(defonce zen-ctx (new-context))
 
 (defn clear-errors! []
   (swap! zen-ctx assoc :errors []))
@@ -226,7 +227,7 @@
      :context {:trigger-character trigger-character
                :trigger-kind (completion-trigger-kind->clj completion-trigger-kind)}}))
 
-(defn completions [_]
+(defn completions [message]
   (let [namespaces (keys (:ns @zen-ctx))
         symbols (keys (:symbols @zen-ctx))
         completions (map #(org.eclipse.lsp4j.CompletionItem. %)
@@ -237,10 +238,49 @@
 (defmulti handle-message
   (fn [message] (:type message)))
 
+(defn set-document [uri content]
+  (swap! zen-ctx assoc-in [:file uri :text] content)
+  (swap! zen-ctx assoc-in [:file uri :lines] (str/split-lines content)))
+
+(defn load-document [message]
+  (if (:text message)
+    (set-document (:uri message) (:text message))
+    (let [f (slurp (:uri message))]
+      (set-document (:uri message) f))))
+
+(defn extract-token [url line pos]
+  (let [line-content (get-in @zen-ctx [:file url :lines line])
+        is-token-char? (fn [chr] ; FIXME: incorrect boundaries
+                         (or (<= (int \a) (int chr) (int \z))
+                             (<= (int \A) (int chr) (int \Z))
+                             (<= (int \0) (int chr) (int \9))
+                             (= \: chr) (= \/ chr)))
+        left-boundary (loop [i (dec pos)]
+                        (println i)
+                        (if (< pos 0)
+                          0
+                          (if (is-token-char? (get line-content pos))
+                            (recur (dec i))
+                            i)))
+        right-boundary pos]
+    (subs pos left-boundary right-boundary)))
+
+
+(defn apply-change [uri change]
+  (if-let [_range (:range change)]
+    (debug "Error: partial change not supported")
+    (set-document uri (:text change))))
+
+(defn update-document [message]
+  (doseq [change (:changes message)]
+    (apply-change (:uri message) change)))
+
 (defmethod handle-message :open [message]
+  (load-document message)
   (lint! (:text message) (:uri message)))
 
 (defmethod handle-message :change [message]
+  (update-document message)
   (lint! (:text (first (:changes message))) (:uri message)))
 
 (defmethod handle-message :completion [message]
