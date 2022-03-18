@@ -248,22 +248,36 @@
     (let [f (slurp (:uri message))]
       (set-document (:uri message) f))))
 
-(defn extract-token [url line pos]
-  (let [line-content (get-in @zen-ctx [:file url :lines line])
-        is-token-char? (fn [chr] ; FIXME: incorrect boundaries
-                         (or (<= (int \a) (int chr) (int \z))
-                             (<= (int \A) (int chr) (int \Z))
-                             (<= (int \0) (int chr) (int \9))
-                             (= \: chr) (= \/ chr)))
-        left-boundary (loop [i (dec pos)]
-                        (println i)
-                        (if (< pos 0)
+
+(defn is-token-char? [chr]
+  ; FIXME: incorrect boundaries
+  (prn chr)
+  (or (<= (int \a) (int chr) (int \z))
+      (<= (int \A) (int chr) (int \Z))
+      (<= (int \0) (int chr) (int \9))
+      (= \: chr) (= \/ chr)))
+
+
+(defn- extract-token* [line-content pos]
+  (let [left-boundary (loop [i (dec pos)]
+                        (if (< i 0)
                           0
-                          (if (is-token-char? (get line-content pos))
+                          (if (is-token-char? (get line-content i))
                             (recur (dec i))
-                            i)))
-        right-boundary pos]
-    (subs pos left-boundary right-boundary)))
+                            i)))]
+    (subs line-content left-boundary pos)))
+
+
+(defn extract-token [url line pos]
+  (-> @zen-ctx
+      (get-in [:file url :lines line])
+      (extract-token* pos)))
+
+
+(comment
+  ; FIXME: move to tests
+  (extract-token* "asdasdadaa" 2)
+  )
 
 
 (defn apply-change [uri change]
