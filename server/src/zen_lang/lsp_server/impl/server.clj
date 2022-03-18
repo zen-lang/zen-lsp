@@ -6,7 +6,9 @@
    [clojure.string :as str]
    [edamame.core :as e]
    [rewrite-clj.parser :as p]
-   [zen-lang.lsp-server.impl.location :refer [get-location]]
+   [zen-lang.lsp-server.impl.location :refer [get-location
+                                              location->zloc
+                                              zloc->path]]
    [zen.core :as zen]
    [zen.store :as store])
   (:import
@@ -30,19 +32,17 @@
     PublishDiagnosticsParams
     Range
     ServerCapabilities
-    TextDocumentIdentifier
-    TextDocumentContentChangeEvent
     TextDocumentSyncKind
     TextDocumentSyncOptions]
    [org.eclipse.lsp4j.launch LSPLauncher]
    [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
 
-
-
-
-
-
 (set! *warn-on-reflection* true)
+
+(defn new-context []
+  (zen/new-context {:unsafe true}))
+
+(defonce zen-ctx (new-context))
 
 (defonce proxy-state (atom nil))
 
@@ -128,11 +128,6 @@
     (debug :finding finding)
     finding))
 
-(defn new-context []
-  (zen/new-context {:unsafe true}))
-
-(defonce zen-ctx (new-context))
-
 (defn clear-errors! []
   (swap! zen-ctx assoc :errors []))
 
@@ -163,12 +158,80 @@
       ;; clear errors for next run
       (clear-errors!))))
 
-(defn completions [^org.eclipse.lsp4j.CompletionParams params]
-  (let [_ (def p params)
-        _td ^TextDocumentIdentifier (.getTextDocument params)
-        p (.getPosition params)
-        line (.getLine p)
-        col (.getCharacter p)
+(defn did-open-text-document-params->clj
+  [^org.eclipse.lsp4j.DidOpenTextDocumentParams params]
+  (let [text-document (.getTextDocument params)
+        text (.getText text-document)
+        uri (.getUri text-document)
+        language-id (.getLanguageId text-document)
+        version (.getVersion text-document)]
+    {:type :open
+     :text text
+     :uri uri
+     :language language-id
+     :version version}))
+
+(defn range->clj [^org.eclipse.lsp4j.Range range]
+  (let [range-start (.getStart range)
+        range-end (.getEnd range)]
+    {:start {:line (.getLine range-start)
+             :character (.getCharacter range-start)}
+     :end {:line (.getLine range-end)
+           :character (.getCharacter range-end)}}))
+
+(defn text-document-content-change-event->clj
+  [^org.eclipse.lsp4j.TextDocumentContentChangeEvent change]
+  (let [range (.getRange change)
+        range-length (.getRangeLength change)
+        text (.getText change)]
+    (cond-> {:text text}
+      range (assoc :range (range->clj range))
+      range-length (assoc :range-length range-length))))
+
+(defn did-change-text-document-params->clj
+  [^org.eclipse.lsp4j.DidChangeTextDocumentParams params]
+  (let [text-document (.getTextDocument params)
+        version (.getVersion text-document)
+        uri (.getUri text-document)
+        changes (.getContentChanges params)]
+    {:type :change
+     :version version
+     :uri uri
+     :changes (mapv text-document-content-change-event->clj changes)}))
+
+(def completion-trigger-kind->clj
+  {org.eclipse.lsp4j.CompletionTriggerKind/Invoked :invoked
+   org.eclipse.lsp4j.CompletionTriggerKind/TriggerCharacter :trigger-character
+   org.eclipse.lsp4j.CompletionTriggerKind/TriggerForIncompleteCompletions :trigger-for-incomplete-completions})
+
+(defn completion-params->clj
+  [^org.eclipse.lsp4j.CompletionParams params]
+  (let [position (.getPosition params)
+        line (.getLine position)
+        character (.getCharacter position)
+        uri (.getUri (.getTextDocument params))
+        context (.getContext params)
+        trigger-character (.getTriggerCharacter context)
+        completion-trigger-kind (.getTriggerKind context)]
+    {:type :completion
+     :position {:line line
+                :character character}
+     :uri uri
+     :context {:trigger-character trigger-character
+               :trigger-kind (completion-trigger-kind->clj completion-trigger-kind)}}))
+
+(defn completions [{:keys [uri position]}]
+  (let [{:keys [line character]} position
+        ;; last-valid-text (get-in @zen-ctx [:file uri :last-valid-text])
+        ;; path (some-> last-valid-text
+        ;;              (p/parse-string)
+        ;;              (location->zloc
+        ;;               ;; VSCode line and col are 0 based while rewrite-clj is 1-based
+        ;;               (inc line)
+        ;;               (inc character))
+        ;;              (zloc->path))
+        ;; ;; TODO: provide path to zen.core function that uses it to provide better completions
+        ;; _ (debug :path path)
         namespaces (keys (:ns @zen-ctx))
         symbols (keys (:symbols @zen-ctx))
         completions (map #(org.eclipse.lsp4j.CompletionItem. %)
@@ -176,30 +239,90 @@
     (CompletableFuture/completedFuture
      (vec completions))))
 
+(defmulti handle-message
+  (fn [message] (:type message)))
+
+(defn set-document [uri content]
+  (swap! zen-ctx assoc-in [:file uri :text] content)
+  (swap! zen-ctx assoc-in [:file uri :lines] (str/split-lines content))
+  ;; store last valid edn
+  (try (let [edn (e/parse-string content)]
+         (swap! zen-ctx assoc-in [:file uri :last-valid-edn] edn)
+         (swap! zen-ctx assoc-in [:file uri :last-valid-text] content))
+       (catch Exception _ nil)))
+
+(defn load-document [message]
+  (if (:text message)
+    (set-document (:uri message) (:text message))
+    (let [f (slurp (:uri message))]
+      (set-document (:uri message) f))))
+
+
+(defn is-token-char? [chr]
+  ;; FIXME: incorrect boundaries
+  (debug :chr chr)
+  (or (<= (int \a) (int chr) (int \z))
+      (<= (int \A) (int chr) (int \Z))
+      (<= (int \0) (int chr) (int \9))
+      (= \: chr) (= \/ chr)))
+
+
+(defn- extract-token* [line-content pos]
+  (let [left-boundary (loop [i (dec pos)]
+                        (if (< i 0)
+                          0
+                          (if (is-token-char? (get line-content i))
+                            (recur (dec i))
+                            i)))]
+    (subs line-content left-boundary pos)))
+
+
+(defn extract-token [url line pos]
+  (-> @zen-ctx
+      (get-in [:file url :lines line])
+      (extract-token* pos)))
+
+
+(comment
+  ;; FIXME: move to tests
+  (extract-token* "asdasdadaa" 2)
+  )
+
+
+(defn apply-change [uri change]
+  (if-let [_range (:range change)]
+    (debug "Error: partial change not supported")
+    (set-document uri (:text change))))
+
+(defn update-document [message]
+  (doseq [change (:changes message)]
+    (apply-change (:uri message) change)))
+
+(defmethod handle-message :open [message]
+  (load-document message)
+  (lint! (:text message) (:uri message)))
+
+(defmethod handle-message :change [message]
+  (update-document message)
+  (lint! (:text (first (:changes message))) (:uri message)))
+
+(defmethod handle-message :completion [message]
+  (completions message))
+
 (deftype LSPTextDocumentService []
   TextDocumentService
   (^void didOpen [_ ^DidOpenTextDocumentParams params]
-   (do! (let [td (.getTextDocument params)
-              text (.getText td)
-              uri (.getUri td)]
-          (debug "opened file, linting:" uri)
-          (lint! text uri))))
+   (handle-message (did-open-text-document-params->clj params)))
 
   (^void didChange [_ ^DidChangeTextDocumentParams params]
-   (do! (let [td ^TextDocumentIdentifier (.getTextDocument params)
-              changes (.getContentChanges params)
-              change (first changes)
-              text (.getText ^TextDocumentContentChangeEvent change)
-              uri (.getUri td)]
-          (debug "changed file, linting:" uri)
-          (lint! text uri))))
+   (handle-message (did-change-text-document-params->clj params)))
 
   (^void didSave [_ ^DidSaveTextDocumentParams _params])
 
   (^void didClose [_ ^DidCloseTextDocumentParams _params])
 
   (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
-   (completions params)))
+   (handle-message (completion-params->clj params))))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
