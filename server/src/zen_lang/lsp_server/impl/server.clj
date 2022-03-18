@@ -163,39 +163,103 @@
       ;; clear errors for next run
       (clear-errors!))))
 
-(defn completions [^org.eclipse.lsp4j.CompletionParams params]
-  (let [_td ^TextDocumentIdentifier (.getTextDocument params)
-        namespaces (keys (:ns @zen-ctx))
+(defn did-open-text-document-params->clj
+  [^org.eclipse.lsp4j.DidOpenTextDocumentParams params]
+  (let [text-document (.getTextDocument params)
+        text (.getText text-document)
+        uri (.getUri text-document)
+        language-id (.getLanguageId text-document)
+        version (.getVersion text-document)]
+    {:type :open
+     :text text
+     :uri uri
+     :language language-id
+     :version version}))
+
+(defn range->clj [^org.eclipse.lsp4j.Range range]
+  (let [range-start (.getStart range)
+        range-end (.getEnd range)]
+    {:start {:line (.getLine range-start)
+             :character (.getCharacter range-start)}
+     :end {:line (.getLine range-end)
+           :character (.getCharacter range-end)}}))
+
+(defn text-document-content-change-event->clj
+  [^org.eclipse.lsp4j.TextDocumentContentChangeEvent change]
+  (let [range (.getRange change)
+        range-length (.getRangeLength change)
+        text (.getText change)]
+    (cond-> {:text text}
+      range (assoc :range (range->clj range))
+      range-length (assoc :range-length range-length))))
+
+(defn did-change-text-document-params->clj
+  [^org.eclipse.lsp4j.DidChangeTextDocumentParams params]
+  (let [text-document (.getTextDocument params)
+        version (.getVersion text-document)
+        uri (.getUri text-document)
+        changes (.getContentChanges params)]
+    {:type :change
+     :version version
+     :uri uri
+     :changes (mapv text-document-content-change-event->clj changes)}))
+
+(def completion-trigger-kind->clj
+  {org.eclipse.lsp4j.CompletionTriggerKind/Invoked :invoked
+   org.eclipse.lsp4j.CompletionTriggerKind/TriggerCharacter :trigger-character
+   org.eclipse.lsp4j.CompletionTriggerKind/TriggerForIncompleteCompletions :trigger-for-incomplete-completions})
+
+
+(defn completion-params->clj
+  [^org.eclipse.lsp4j.CompletionParams params]
+  (let [position (.getPosition params)
+        line (.getLine position)
+        character (.getCharacter position)
+        uri (.getUri (.getTextDocument params))
+        context (.getContext params)
+        trigger-character (.getTriggerCharacter context)
+        completion-trigger-kind (.getTriggerKind context)]
+    {:type :completion
+     :position {:line line
+                :character character}
+     :uri uri
+     :context {:trigger-character trigger-character
+               :trigger-kind (completion-trigger-kind->clj completion-trigger-kind)}}))
+
+(defn completions [_]
+  (let [namespaces (keys (:ns @zen-ctx))
         symbols (keys (:symbols @zen-ctx))
         completions (map #(org.eclipse.lsp4j.CompletionItem. %)
                          (map str (concat namespaces symbols)))]
     (CompletableFuture/completedFuture
      (vec completions))))
 
+(defmulti handle-message
+  (fn [message] (:type message)))
+
+(defmethod handle-message :open [message]
+  (lint! (:text message) (:uri message)))
+
+(defmethod handle-message :change [message]
+  (lint! (:text (first (:changes message))) (:uri message)))
+
+(defmethod handle-message :completion [message]
+  (completions message))
+
 (deftype LSPTextDocumentService []
   TextDocumentService
   (^void didOpen [_ ^DidOpenTextDocumentParams params]
-   (do! (let [td (.getTextDocument params)
-              text (.getText td)
-              uri (.getUri td)]
-          (debug "opened file, linting:" uri)
-          (lint! text uri))))
+   (handle-message (did-open-text-document-params->clj params)))
 
   (^void didChange [_ ^DidChangeTextDocumentParams params]
-   (do! (let [td ^TextDocumentIdentifier (.getTextDocument params)
-              changes (.getContentChanges params)
-              change (first changes)
-              text (.getText ^TextDocumentContentChangeEvent change)
-              uri (.getUri td)]
-          (debug "changed file, linting:" uri)
-          (lint! text uri))))
+   (handle-message (did-change-text-document-params->clj params)))
 
   (^void didSave [_ ^DidSaveTextDocumentParams _params])
 
   (^void didClose [_ ^DidCloseTextDocumentParams _params])
 
   (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
-   (completions params)))
+   (handle-message (completion-params->clj params))))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
