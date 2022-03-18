@@ -98,6 +98,49 @@ Extension will be started with vscode-extension/debug-srv script
 This script start LSP server + nrepl with cider mw
 Then you can connect to nrepl (see .nrepl-port) from emacs
 
+
+### Connect to zen-lsp repl
+
+Prerequisites:
+
+1) Install VSCode
+2) Clone zen-lsp repo: `git clone https://github.com/zen-lang/zen-lsp.git`
+
+We will open `extension.ts` in first instance of VSCode, VSCode1:
+
+3) In VSCode1 open the file `/home/ier/src/hs/zen-lsp/vscode-extension/src/extension.ts`
+4) Run in VSCode1 Terminal the command: `npm install`
+5) In VSCode1 start debugging process using menu: `Run -> Start Debugging`
+ 
+The second VSCode instance will be opened after that automatically. Next steps we will perform in VSCode2:
+
+6) In VSCode2 open project `/home/ier/src/hs/sansara/box/zrc/`
+7) Open any .edn file from current project, e.g. `/home/ier/src/hs/sansara/box/zrc/box/cluster.edn`
+8) Open VSCode Terminal and switch to Output tab.
+9) You will get following log output there:
+```
+started
+[Info  - 2:59:34 PM] nrepl started at 38047
+[Info  - 2:59:34 PM] Initializing paths in /home/ier/src/hs/sansara/box/zrc
+[Info  - 2:59:34 PM] zen-lsp language server loaded.
+opened file, linting: file:///home/ier/src/hs/sansara/box/zrc/box/cluster.edn
+```
+
+We will eval our form in Doom Emacs:
+
+10) In Emacs open `/home/ier/src/hs/zen-lsp/server/dev/vs_debug.clj`
+11) Connect to repl with `SPC m c`, choose `localhost`, and your `server:port`
+12) Eval whole buffer with `SPC m e b`, 
+13) Go to ln:15 and put your cursor after `(lsp/info "Hi from cider")` form. Eval this form with `SPC m e e`
+   
+14) Open VSCode2 and check out the VSCode Output window
+```
+[Info  - 3:02:10 PM] Hi from cider
+```
+
+If you see the same output you have made it!
+
+
 ## License
 
 TODO
