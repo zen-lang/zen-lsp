@@ -6,7 +6,9 @@
    [clojure.string :as str]
    [edamame.core :as e]
    [rewrite-clj.parser :as p]
-   [zen-lang.lsp-server.impl.location :refer [get-location]]
+   [zen-lang.lsp-server.impl.location :refer [get-location
+                                              location->zloc
+                                              zloc->path]]
    [zen.core :as zen]
    [zen.store :as store])
   (:import
@@ -30,17 +32,10 @@
     PublishDiagnosticsParams
     Range
     ServerCapabilities
-    TextDocumentIdentifier
-    TextDocumentContentChangeEvent
     TextDocumentSyncKind
     TextDocumentSyncOptions]
    [org.eclipse.lsp4j.launch LSPLauncher]
    [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
-
-
-
-
-
 
 (set! *warn-on-reflection* true)
 
@@ -133,7 +128,6 @@
     (debug :finding finding)
     finding))
 
-
 (defn clear-errors! []
   (swap! zen-ctx assoc :errors []))
 
@@ -210,7 +204,6 @@
    org.eclipse.lsp4j.CompletionTriggerKind/TriggerCharacter :trigger-character
    org.eclipse.lsp4j.CompletionTriggerKind/TriggerForIncompleteCompletions :trigger-for-incomplete-completions})
 
-
 (defn completion-params->clj
   [^org.eclipse.lsp4j.CompletionParams params]
   (let [position (.getPosition params)
@@ -227,8 +220,19 @@
      :context {:trigger-character trigger-character
                :trigger-kind (completion-trigger-kind->clj completion-trigger-kind)}}))
 
-(defn completions [message]
-  (let [namespaces (keys (:ns @zen-ctx))
+(defn completions [{:keys [uri position]}]
+  (let [{:keys [line character]} position
+        ;; last-valid-text (get-in @zen-ctx [:file uri :last-valid-text])
+        ;; path (some-> last-valid-text
+        ;;              (p/parse-string)
+        ;;              (location->zloc
+        ;;               ;; VSCode line and col are 0 based while rewrite-clj is 1-based
+        ;;               (inc line)
+        ;;               (inc character))
+        ;;              (zloc->path))
+        ;; ;; TODO: provide path to zen.core function that uses it to provide better completions
+        ;; _ (debug :path path)
+        namespaces (keys (:ns @zen-ctx))
         symbols (keys (:symbols @zen-ctx))
         completions (map #(org.eclipse.lsp4j.CompletionItem. %)
                          (map str (concat namespaces symbols)))]
@@ -240,7 +244,12 @@
 
 (defn set-document [uri content]
   (swap! zen-ctx assoc-in [:file uri :text] content)
-  (swap! zen-ctx assoc-in [:file uri :lines] (str/split-lines content)))
+  (swap! zen-ctx assoc-in [:file uri :lines] (str/split-lines content))
+  ;; store last valid edn
+  (try (let [edn (e/parse-string content)]
+         (swap! zen-ctx assoc-in [:file uri :last-valid-edn] edn)
+         (swap! zen-ctx assoc-in [:file uri :last-valid-text] content))
+       (catch Exception _ nil)))
 
 (defn load-document [message]
   (if (:text message)
@@ -250,8 +259,8 @@
 
 
 (defn is-token-char? [chr]
-  ; FIXME: incorrect boundaries
-  (prn chr)
+  ;; FIXME: incorrect boundaries
+  (debug :chr chr)
   (or (<= (int \a) (int chr) (int \z))
       (<= (int \A) (int chr) (int \Z))
       (<= (int \0) (int chr) (int \9))
@@ -275,7 +284,7 @@
 
 
 (comment
-  ; FIXME: move to tests
+  ;; FIXME: move to tests
   (extract-token* "asdasdadaa" 2)
   )
 
