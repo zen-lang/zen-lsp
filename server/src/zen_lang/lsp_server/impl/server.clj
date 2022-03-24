@@ -222,16 +222,17 @@
 
 (defn completions [{:keys [uri position]}]
   (let [{:keys [line character]} position
-        ;; last-valid-text (get-in @zen-ctx [:file uri :last-valid-text])
-        ;; path (some-> last-valid-text
-        ;;              (p/parse-string)
-        ;;              (location->zloc
-        ;;               ;; VSCode line and col are 0 based while rewrite-clj is 1-based
-        ;;               (inc line)
-        ;;               (inc character))
-        ;;              (zloc->path))
-        ;; ;; TODO: provide path to zen.core function that uses it to provide better completions
-        ;; _ (debug :path path)
+        last-valid-text (get-in @zen-ctx [:file uri :last-valid-text])
+        path (try (some-> last-valid-text
+                         (p/parse-string)
+                         (location->zloc
+                          ;; VSCode line and col are 0 based while rewrite-clj is 1-based
+                          (inc line)
+                          (inc character))
+                         (zloc->path))
+                  (catch Exception e (debug (ex-message e))))
+        ;; TODO: provide path to zen.core function that uses it to provide better completions
+        _ (debug :path path)
         namespaces (keys (:ns @zen-ctx))
         symbols (keys (:symbols @zen-ctx))
         completions (map #(org.eclipse.lsp4j.CompletionItem. %)
