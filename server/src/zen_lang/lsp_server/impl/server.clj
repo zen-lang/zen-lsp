@@ -66,7 +66,7 @@
 (defn info [& msgs]
   (apply log! :info msgs))
 
-(def debug? true)
+(def debug? (= "true" (System/getenv "ZEN_LSP_DEBUG")))
 
 (defn debug [& msgs]
   (when debug?
@@ -222,16 +222,23 @@
 
 (defn completions [{:keys [uri position]}]
   (let [{:keys [line character]} position
+        text (get-in @zen-ctx [:file uri :text])
         last-valid-text (get-in @zen-ctx [:file uri :last-valid-text])
-        path (try (some-> last-valid-text
-                         (p/parse-string)
-                         (location->zloc
-                          ;; VSCode line and col are 0 based while rewrite-clj is 1-based
-                          (inc line)
-                          (inc character))
-                         (zloc->path))
+        line (inc line) ;; lsp lines are 0-based, rewrite-clj lines are 1-based
+        character (inc character)
+        parsed (try (p/parse-string text)
+                    (catch Exception _
+                      ;; this shouldn't throw
+                      (try (p/parse-string last-valid-text)
+                           (catch Exception e (debug (ex-message e))))))
+        path (try (some-> parsed
+                          (location->zloc
+                           line
+                           character)
+                          (zloc->path))
                   (catch Exception e (debug (ex-message e))))
-        ;; TODO: provide path to zen.core function that uses it to provide better completions
+        ;; TODO: provide path and last-valid-text to zen.core function that uses
+        ;; it to provide better completions
         _ (debug :path path)
         namespaces (keys (:ns @zen-ctx))
         symbols (keys (:symbols @zen-ctx))

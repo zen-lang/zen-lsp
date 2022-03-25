@@ -26,7 +26,7 @@
   (when-let [zloc (some-> edn-node z/edn)]
     (loop [wrapping-zloc nil
            zloc zloc]
-      (when zloc
+      (if zloc
         (let [{node-row :row
                node-col :col
                node-end-row :end-row
@@ -40,7 +40,8 @@
               zloc)
             (if (z/end? zloc)
               wrapping-zloc
-              (recur wrapping-zloc (z/next zloc)))))))))
+              (recur wrapping-zloc (z/next zloc)))))
+        wrapping-zloc))))
 
 (defn left-count [zloc]
   (count (take-while identity (rest (iterate z/left zloc)))))

@@ -2,4 +2,4 @@
 
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-cd $SCRIPTPATH/../server && clojure -M:nrepl -m vs-debug
+cd $SCRIPTPATH/../server && ZEN_LSP_DEBUG=true clojure -M:nrepl -m vs-debug

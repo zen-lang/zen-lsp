@@ -26,7 +26,11 @@ jobs:
           distribution: 'adopt'
           java-version: '8'
 
-      - name: Publish assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bb publish
+      - name: Run tests
+      - run: |
+          bb server:test
+
+      # - name: Publish assets
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: bb publish
