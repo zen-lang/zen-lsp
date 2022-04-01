@@ -69,6 +69,9 @@
         (vec (reverse path))
         :else (recur parent (conj path (z/sexpr zloc)))))))
 
+(defn zloc->node [zloc]
+  (z/node zloc))
+
 (comment
   (location->zloc (p/parse-string "{:a {:b [1 2 3]}}") 1 1) {:a ...}
 

@@ -3,12 +3,14 @@
   (:require
    [babashka.fs :as fs]
    [clojure.edn :as edn]
+   [clojure.java.io :as io]
    [clojure.string :as str]
    [edamame.core :as e]
    [rewrite-clj.parser :as p]
-   [zen-lang.lsp-server.impl.location :refer [get-location
-                                              location->zloc
-                                              zloc->path]]
+   [zen-lang.lsp-server.impl.location :as loc
+    :refer [get-location
+            location->zloc
+            zloc->path]]
    [zen.core :as zen]
    [zen.store :as store])
   (:import
@@ -247,6 +249,40 @@
     (CompletableFuture/completedFuture
      (vec completions))))
 
+(defn definition-params->clj
+  [^org.eclipse.lsp4j.DefinitionParams params]
+  (let [position (.getPosition params)
+        line (.getLine position)
+        character (.getCharacter position)
+        uri (.getUri (.getTextDocument params))]
+    {:type :definition
+     :position {:line line
+                :character character}
+     :uri uri}))
+
+(defn definition [{:keys [uri position]}]
+  (CompletableFuture/completedFuture
+   (let [{:keys [line character]} position
+         line (inc line) ;; lsp lines are 0-based, rewrite-clj lines are 1-based
+         character (inc character)
+         text (get-in @zen-ctx [:file uri :last-valid-text])
+         parsed (p/parse-string text)
+         node (try (some-> parsed
+                           (location->zloc
+                            line
+                            character)
+                           loc/zloc->node)
+                   (catch Exception e (debug (ex-message e))))
+         sym (:value node)
+         uri (when (symbol? sym)
+               (let [ns (or (some-> (namespace sym) symbol)
+                            sym)]
+                 (when-let [file (get-in @zen-ctx [:ns ns :zen/file])]
+                   (let [ uri (str (.toURI (io/file file)))]
+                     uri))))]
+     (when uri
+       (vec [(org.eclipse.lsp4j.Location. uri (Range. (Position. 0 0) (Position. 0 1)))])))))
+
 (defmulti handle-message
   (fn [message] (:type message)))
 
@@ -317,6 +353,9 @@
 (defmethod handle-message :completion [message]
   (completions message))
 
+(defmethod handle-message :definition [message]
+  (definition message))
+
 (deftype LSPTextDocumentService []
   TextDocumentService
   (^void didOpen [_ ^DidOpenTextDocumentParams params]
@@ -330,16 +369,15 @@
   (^void didClose [_ ^DidCloseTextDocumentParams _params])
 
   (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
-   (handle-message (completion-params->clj params))))
+   (handle-message (completion-params->clj params)))
+  (^CompletableFuture definition [_ ^org.eclipse.lsp4j.DefinitionParams params]
+   (handle-message (definition-params->clj params))))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
   (^CompletableFuture executeCommand [_ ^ExecuteCommandParams _params])
   (^void didChangeConfiguration [_ ^DidChangeConfigurationParams _params])
   (^void didChangeWatchedFiles [_ ^DidChangeWatchedFilesParams _params]))
-
-(defn edn-files-in-dir [root dir]
-  (map fs/file (fs/glob (fs/file root dir) "*.edn")))
 
 (defn initialize-paths [{:keys [root]}]
   (when root
@@ -359,7 +397,8 @@
                            (.setTextDocumentSync (doto (TextDocumentSyncOptions.)
                                                    (.setOpenClose true)
                                                    (.setChange TextDocumentSyncKind/Full)))
-                           (.setCompletionProvider (org.eclipse.lsp4j.CompletionOptions. false [":" "/"]))))))
+                           (.setCompletionProvider (org.eclipse.lsp4j.CompletionOptions. false [":" "/"]))
+                           (.setDefinitionProvider true)))))
     (^CompletableFuture initialized [^InitializedParams params]
      (info "zen-lsp language server loaded."))
     (^CompletableFuture shutdown []
