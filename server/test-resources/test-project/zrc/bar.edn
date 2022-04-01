@@ -5,4 +5,6 @@
  {:zen/tags #{zen/schema}
   :type zen/map
   :keys {:foo {:confirms #{foo/schema}} ;; No errors expected
-         }}}
+         }}
+
+ }

@@ -11,6 +11,7 @@
     :refer [get-location
             location->zloc
             zloc->path]]
+   [zen-lang.lsp-server.impl.autocomplete :as autocomplete]
    [zen.core :as zen]
    [zen.store :as store])
   (:import
@@ -244,8 +245,10 @@
         _ (debug :path path)
         namespaces (keys (:ns @zen-ctx))
         symbols (keys (:symbols @zen-ctx))
+        zen-completions' (autocomplete/find-completions zen-ctx {:uri uri :struct-path path})
         completions (map #(org.eclipse.lsp4j.CompletionItem. %)
-                         (map str (concat namespaces symbols)))]
+                         (or zen-completions'
+                             (map str (concat namespaces symbols))))]
     (CompletableFuture/completedFuture
      (vec completions))))
 

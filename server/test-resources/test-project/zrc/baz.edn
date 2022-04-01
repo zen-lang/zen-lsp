@@ -1,0 +1,22 @@
+{ns baz
+ import #{foo}
+
+ schema
+ {:zen/tags #{zen/schema}
+  :type zen/map
+  :keys {:foo {:confirms #{foo/schema}} ;; No errors expected
+         }}
+
+ schema2
+ {:zen/tags #{zen/schema}
+  :type zen/map
+  :keys {:foo {:type zen/coll
+               ,
+               }
+         :baz {:type zen/string
+               ,
+
+               }
+         :qux {:type zen/string
+               ,
+               }}}}
