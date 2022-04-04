@@ -39,3 +39,9 @@
                   (count maps#) (count res#)))
       (doseq [m# maps#]
         (is (some #(submap? m# %) res#) (str "No superset of " m# " found"))))))
+
+
+;; TODO: REVIEW - is this ok?
+;; (assert-submaps
+;;  [{:a 10} {:b 11} {:b 11} {:b 11} ]
+;;  [{:a 10 :b 11} {:gg 111} {} {}])
