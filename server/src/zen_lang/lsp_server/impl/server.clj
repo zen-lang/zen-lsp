@@ -4,14 +4,15 @@
    [babashka.fs :as fs]
    [clojure.edn :as edn]
    [clojure.java.io :as io]
+   [clojure.pprint :as pprint]
    [clojure.string :as str]
    [edamame.core :as e]
    [rewrite-clj.parser :as p]
+   [zen-lang.lsp-server.impl.autocomplete :as autocomplete]
    [zen-lang.lsp-server.impl.location :as loc
     :refer [get-location
             location->zloc
             zloc->path]]
-   [zen-lang.lsp-server.impl.autocomplete :as autocomplete]
    [zen.core :as zen]
    [zen.store :as store])
   (:import
@@ -286,6 +287,48 @@
      (when uri
        (vec [(org.eclipse.lsp4j.Location. uri (Range. (Position. 0 0) (Position. 0 1)))])))))
 
+(defn hover-params->clj
+  [^org.eclipse.lsp4j.HoverParams params]
+  (let [position (.getPosition params)
+        line (.getLine position)
+        character (.getCharacter position)
+        uri (.getUri (.getTextDocument params))]
+    {:type :hover
+     :position {:line line
+                :character character}
+     :uri uri}))
+
+(defn hover [{:keys [uri position]}]
+  (CompletableFuture/completedFuture
+   (let [{:keys [line character]} position
+         line (inc line) ;; lsp lines are 0-based, rewrite-clj lines are 1-based
+         character (inc character)
+         text (get-in @zen-ctx [:file uri :last-valid-text])
+         parsed (p/parse-string text)
+         node (try (some-> parsed
+                           (location->zloc
+                            line
+                            character)
+                           loc/zloc->node)
+                   (catch Exception e (debug (ex-message e))))
+         sym (:value node)
+         s (when (symbol? sym)
+             (let [ns (or (some-> (namespace sym) symbol)
+                          sym)
+                   obj (get-in @zen-ctx [:ns ns])
+                   obj (if (namespace sym)
+                         (get obj (symbol (name sym)))
+                         obj)
+                   desc (get obj :zen/desc)]
+               (str desc "\n\n"
+                    (with-out-str
+                      (binding [clojure.pprint/*print-miser-width* 10]
+                        (clojure.pprint/pprint obj))))))]
+     (when s
+       (org.eclipse.lsp4j.Hover. (doto (org.eclipse.lsp4j.MarkupContent.)
+                                   (.setKind "plaintext")
+                                   (.setValue s)))))))
+
 (defmulti handle-message
   (fn [message] (:type message)))
 
@@ -359,6 +402,9 @@
 (defmethod handle-message :definition [message]
   (definition message))
 
+(defmethod handle-message :hover [message]
+  (hover message))
+
 (deftype LSPTextDocumentService []
   TextDocumentService
   (^void didOpen [_ ^DidOpenTextDocumentParams params]
@@ -374,7 +420,9 @@
   (^CompletableFuture completion [_ ^org.eclipse.lsp4j.CompletionParams params]
    (handle-message (completion-params->clj params)))
   (^CompletableFuture definition [_ ^org.eclipse.lsp4j.DefinitionParams params]
-   (handle-message (definition-params->clj params))))
+   (handle-message (definition-params->clj params)))
+  (^CompletableFuture hover [_ ^org.eclipse.lsp4j.HoverParams params]
+   (handle-message (hover-params->clj params))))
 
 (deftype LSPWorkspaceService []
   WorkspaceService
@@ -401,7 +449,8 @@
                                                    (.setOpenClose true)
                                                    (.setChange TextDocumentSyncKind/Full)))
                            (.setCompletionProvider (org.eclipse.lsp4j.CompletionOptions. false [":" "/"]))
-                           (.setDefinitionProvider true)))))
+                           (.setDefinitionProvider true)
+                           (.setHoverProvider true)))))
     (^CompletableFuture initialized [^InitializedParams params]
      (info "zen-lsp language server loaded."))
     (^CompletableFuture shutdown []
