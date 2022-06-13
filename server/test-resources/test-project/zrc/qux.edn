@@ -1,0 +1,25 @@
+{ns qux
+ import #{baz}
+
+ grand-parent-schema
+ {:zen/tags #{zen/schema}
+   :type zen/map
+   :keys {:grand-parent-key {:type zen/string}}
+   :zen/desc "A cool schema"}
+
+ parent-schema
+ {:zen/tags #{zen/schema}
+  :type zen/map
+  :confirms #{baz/schema2 grand-parent-schema}
+  :keys {:parent-key {:type zen/string}}
+  :zen/desc "A cool schema"}
+
+ schema
+ {:zen/tags #{zen/schema}
+  :type zen/map
+  :confirms #{parent-schema}
+  :keys {:hello {:type zen/string
+                 :confirms #{grand-parent-schema}
+                 :keys {}}
+         :baz {}}
+  :zen/desc "A cool schema"}}

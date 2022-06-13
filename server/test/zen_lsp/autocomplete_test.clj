@@ -10,6 +10,7 @@
   (do (alter-var-root #'server/zen-ctx (constantly (server/new-context)))
       (server/initialize-paths {:root "test-resources/test-project"})
       (server/load-document (file->message "test-resources/test-project/zrc/baz.edn"))
+      (server/load-document (file->message "test-resources/test-project/zrc/foo.edn"))
       server/zen-ctx))
 
 (deftest find-completions-test
@@ -31,5 +32,17 @@
       (is (= (conj (->> @ztx :symbols keys (mapv str) set) "schema" "schema2")
              (let [f "test-resources/test-project/zrc/baz.edn"
                    path ['schema2 :qux :type]]
-               (set (zl/find-completions ztx {:uri f :struct-path path}))))) )
+               (set (zl/find-completions ztx {:uri f :struct-path path}))))))
+
+    (testing "following hierarchy of symbols by the :confirm key gather all possible keys"
+      (is (= (let [parent-keys       (get-in @ztx [:symbols 'qux/parent-schema :keys])
+                   grand-parent-keys (get-in @ztx [:symbols 'qux/grand-parent-schema :keys])
+                   imported-keys     (get-in @ztx [:symbols 'baz/schema2 :keys])]
+               (->> (concat parent-keys grand-parent-keys imported-keys)
+                    keys
+                    set
+                    (map str)
+                    vec))
+             (let [f "test-resources/test-project/zrc/qux.edn"]
+               (zl/find-completions ztx {:uri f :struct-path ['schema :keys]})))))
     ))
