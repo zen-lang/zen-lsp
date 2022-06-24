@@ -3,9 +3,82 @@
 (defn gather-confirming-keys
   [ztx confirmings]
   (when (seq confirmings)
-    (mapcat #(concat (keys (get-in @ztx [:symbols % :keys]))
-                     (gather-confirming-keys ztx (:confirms (get-in @ztx [:symbols %]))))
-            confirmings)))
+    (->> confirmings
+         (mapcat (fn [schema-sym]
+                   (let [schema-keys (keys (get-in @ztx [:symbols schema-sym :keys]))
+                         schema-confirms (get-in @ztx [:symbols schema-sym :confirms])]
+                     (concat schema-keys
+                             (gather-confirming-keys ztx schema-confirms))))))))
+
+(defn uri->edn
+  "Returns the appropriate loaded namespace for given file `uri` as EDN"
+  [ztx uri]
+  (-> (get-in ztx [:file uri])
+      :last-valid-edn))
+
+(defn ns->edn [ztx ns-sym]
+  (get-in ztx [:ns ns-sym]))
+
+(defn namespaced? [sym]
+  (-> sym namespace seq boolean))
+
+(defn fqns-sym
+  "Returns namespaced symbol `sym` as is or namespaces `sym` with `ns-str`"
+  [ns-str sym]
+  (if (namespaced? sym)
+    sym
+    (symbol ns-str (str sym))))
+
+(def reserved-symbols
+  #{'import 'ns})
+
+(defn reserved? [sym]
+  (contains? reserved-symbols sym))
+
+(defn model-sym?
+  "Is `x` a valid model identifier?"
+  [x]
+  (and (symbol? x)
+       (not (reserved? x))))
+
+(defn make-list-models [ns-sym]
+  (fn list-models [[zns content]]
+    (->> (keys content)
+         (filter model-sym?)
+         (map (fn local-or-external-model-name [sym]
+                (if (= ns-sym zns)
+                  sym
+                  (symbol (str zns) (str sym))))))))
+
+(defn current-ns [ztx uri]
+  (get (uri->edn ztx uri) 'ns))
+
+(defn find-models-to-confirm
+  "Traverses all loaded namespaces and collects declared models.
+  Returns sorted collection of namespaced model symbols."
+  [ztx uri]
+  (let [curr-ns (current-ns ztx uri)
+        collect-models (make-list-models curr-ns)]
+    (->> (:ns ztx)
+         (mapcat collect-models)
+         sort
+         (mapv str))))
+
+
+(defn find-models-to-complete-tags
+  "Traverses imported namespaces (incl. 'zen) and collects declared models.
+  Returns sorted collection of namespaced model symbols."
+  [ztx uri]
+  (let [curr-ns (current-ns ztx uri)
+        curr-ns-data (ns->edn ztx curr-ns)
+        collect-models (make-list-models curr-ns)
+        imported-nsx (->> (get curr-ns-data 'import)
+                          (into #{'zen})
+                          vec)]
+    (->> (select-keys (:ns ztx) imported-nsx)
+         (mapcat collect-models)
+         sort
+         (mapv str))))
 
 (defn find-completions [ztx {:keys [uri struct-path]}]
   (cond
@@ -31,7 +104,17 @@
                            %)
                         (:confirms pos-ctx-struct))
           confirming-keys (gather-confirming-keys ztx confirms)]
-          (vec (map str confirming-keys)))
+      (->> confirming-keys
+           (map str)
+           sort
+           vec))
+
+    ;; suggest models to confirm to
+    (= :confirms (last struct-path))
+    (find-models-to-confirm @ztx uri)
+
+    (= :zen/tags (last struct-path))
+    (find-models-to-complete-tags @ztx uri)
 
     ;; schema :keys keyword suggestion
     :else
@@ -41,5 +124,3 @@
         (->> (get-in @ztx [:symbols type-symbol :keys]) keys sort (mapv str))))))
 
 
-(comment
-  )
