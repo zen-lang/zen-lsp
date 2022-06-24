@@ -337,6 +337,8 @@
   (swap! zen-ctx assoc-in [:file uri :lines] (str/split-lines content))
   ;; store last valid edn
   (try (let [edn (e/parse-string content)]
+         (store/read-ns zen-ctx (get edn 'ns))
+
          (swap! zen-ctx assoc-in [:file uri :last-valid-edn] edn)
          (swap! zen-ctx assoc-in [:file uri :last-valid-text] content))
        (catch Exception _ nil)))
