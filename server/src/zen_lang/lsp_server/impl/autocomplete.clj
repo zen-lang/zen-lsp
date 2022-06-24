@@ -72,10 +72,10 @@
   (let [curr-ns (current-ns ztx uri)
         curr-ns-data (ns->edn ztx curr-ns)
         collect-models (make-list-models curr-ns)
-        imported-nsx (->> (get curr-ns-data 'import)
-                          (into #{'zen})
+        relevant-nsx (->> (get curr-ns-data 'import)
+                          (into #{'zen curr-ns})
                           vec)]
-    (->> (select-keys (:ns ztx) imported-nsx)
+    (->> (select-keys (:ns ztx) relevant-nsx)
          (mapcat collect-models)
          sort
          (mapv str))))

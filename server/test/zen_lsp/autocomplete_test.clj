@@ -70,12 +70,15 @@
            (take 8 result)))))
 
 (deftest complete-tags
-  (let [f "test-resources/test-project/zrc/baz.edn"
-        result (zl/find-completions ztx {:uri f :struct-path ['schema2 :zen/tags]})]
-    (is (= ["foo/schema"
-            "zen/any"
-            "zen/vector"]
-           (conj (vec (take 2 result)) (last result))))))
+  (testing "should consider models from current, imported and zen core namespaces"
+    (let [f "test-resources/test-project/zrc/baz.edn"
+          result (zl/find-completions ztx {:uri f :struct-path ['schema2 :zen/tags]})]
+      (is (= ["schema"
+              "schema2"
+              "foo/schema"
+              "zen/any"
+              "zen/vector"]
+             (conj (vec (take 4 result)) (last result)))))))
 
 ;;; FIXME exploration tools, remove asap
 (defn ctx [] (deref ztx))
