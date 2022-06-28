@@ -104,21 +104,29 @@ Then you can connect to nrepl (see .nrepl-port) from emacs
 Prerequisites:
 
 1) Install VSCode
+
 2) Clone zen-lsp repo: `git clone https://github.com/zen-lang/zen-lsp.git`
 
 We will open `extension.ts` in first instance of VSCode, VSCode1:
 
 3) In VSCode1 open the dir `/home/ier/src/hs/zen-lsp/vscode-extension`
+
 4) In VSCode1 open the file `/home/ier/src/hs/zen-lsp/vscode-extension/src/extension.ts`
+
 5) Run in VSCode1 Terminal the command: `npm install`
+
 6) In VSCode1 start debugging process using menu: `Run -> Start Debugging`
 
 The second VSCode instance will be opened after that automatically. Next steps we will perform in VSCode2:
 
 7) In VSCode2 open project `/home/ier/src/hs/sansara/box/zrc/`
+
 8) Open any .edn file from current project, e.g. `/home/ier/src/hs/sansara/box/zrc/box/cluster.edn`
+
 9) Open VSCode Terminal and switch to Output tab.
+
 10) Select zen-lsp output in Output tab.
+
 11) You will get following log output there:
 
 ```
