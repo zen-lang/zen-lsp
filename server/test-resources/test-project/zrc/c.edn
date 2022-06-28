@@ -1,0 +1,8 @@
+{ns c
+
+ schema
+ {:zen/tags #{zen/tag zen/schema}
+  :type zen/map
+  :keys {:foo {:confirms #{zen/string}}}}
+
+ }

@@ -41,6 +41,13 @@
   (and (symbol? x)
        (not (reserved? x))))
 
+(defn model-name
+  "Returns model name symbol as is or as namespaced symbol"
+  [from-ns model-ns model-sym]
+  (if (= model-ns from-ns)
+    model-sym
+    (symbol (str model-ns) (str model-sym))))
+
 (defn make-list-models [ns-sym]
   (fn list-models [[zns content]]
     (->> (keys content)
@@ -50,35 +57,107 @@
                   sym
                   (symbol (str zns) (str sym))))))))
 
+(defn model-keys [m]
+  (->> (keys m)
+       (filter model-sym?)))
+
+(defn models [namespace-map]
+  (select-keys namespace-map (model-keys namespace-map)))
+
+(defn tagged-model?
+  "Returns true if given model has all `tags`"
+  [tags [_model-sym model-attrs]]
+  (clojure.set/subset? (set tags) (:zen/tags model-attrs)))
+
+;; TODO: remove asap
+(defn collect-models-from
+  [{:keys [name-fn tags]} namespace-map]
+  (let [ns* (get namespace-map 'ns)]
+    (->> namespace-map
+         (keep (fn [[k v]]
+                 (when (and (model-sym? k)
+                            (clojure.set/subset? (set tags) (:zen/tags v)))
+                   (name-fn ns* k)))))))
+
+;; TODO: remove asap
+(defn collect-models
+  [{:keys [name-fn tags]} namespace-map]
+  (some->> (models namespace-map)
+           (filter (partial tagged-model? tags))
+           (map (fn [[model-sym _]]
+                  (name-fn (get namespace-map 'ns) model-sym)))
+           set))
+
 (defn current-ns [ztx uri]
   (get (uri->edn ztx uri) 'ns))
+
+(defn collect-models-recur
+  "Collects tagged models from `ns` down the imports tree.
+
+  NOTE: Circular imports are not allowed."
+  [{:keys [get-ns _tags] :as opts} ns]
+  (loop [models (collect-models opts ns)
+         imports (get ns 'import)]
+    (if (empty? imports)
+      models
+      (recur (->> (collect-models-recur opts (get-ns (first imports)))
+                  (clojure.set/union models))
+             (rest imports)))))
 
 (defn find-models-to-confirm
   "Traverses all loaded namespaces and collects declared models.
   Returns sorted collection of namespaced model symbols."
-  [ztx uri]
+  [ztx uri struct-path]
   (let [curr-ns (current-ns ztx uri)
-        collect-models (make-list-models curr-ns)]
-    (->> (:ns ztx)
-         (mapcat collect-models)
+        focused-model (first struct-path)
+        opts {:name-fn (partial model-name curr-ns)
+              :get-ns #(get-in ztx [:ns %])
+              :tags #{'zen/schema}}
+        ;; TODO: why zen models are tagged with 'schema instead of 'zen/schema?
+        zen-models (collect-models (assoc opts :tags #{'schema}) (get-in ztx [:ns 'zen]))]
+    (->> (disj (collect-models-recur opts (ns->edn ztx curr-ns)) focused-model)
+         (clojure.set/union zen-models)
          sort
-         (mapv str))))
+         (mapv str)))
+  #_(let [curr-ns (current-ns ztx uri)
+          collect-models (make-list-models curr-ns)]
+      (->> (:ns ztx)
+           (mapcat collect-models)
+           sort
+           (mapv str))))
 
+;; TODO: remove asap
+(defn tagged? [ztx sym tags]
+  (let [sym-tags (get-in ztx [:symbols sym :zen/tags])]
+    (and (seq sym-tags)
+         (clojure.set/subset? (set tags) (set sym-tags)))))
 
 (defn find-models-to-complete-tags
-  "Traverses imported namespaces (incl. 'zen) and collects declared models.
+  "Traverses imported namespaces (incl. 'zen) and collects models tagged with 'zen/tag.
   Returns sorted collection of namespaced model symbols."
   [ztx uri]
   (let [curr-ns (current-ns ztx uri)
-        curr-ns-data (ns->edn ztx curr-ns)
-        collect-models (make-list-models curr-ns)
-        relevant-nsx (->> (get curr-ns-data 'import)
-                          (into #{'zen curr-ns})
-                          vec)]
-    (->> (select-keys (:ns ztx) relevant-nsx)
-         (mapcat collect-models)
+        opts {:name-fn (partial model-name curr-ns)
+              :get-ns #(get-in ztx [:ns %])
+              :tags #{'zen/tag}}
+        ;; TODO: why zen models are tagged with 'tag instead of 'zen/tag?
+        zen-models (collect-models (assoc opts :tags #{'tag}) (get-in ztx [:ns 'zen]))]
+    (->> (collect-models-recur opts (ns->edn ztx curr-ns))
+         (clojure.set/union zen-models)
          sort
-         (mapv str))))
+         (mapv str)))
+  #_(let [curr-ns (current-ns ztx uri)
+          curr-ns-data (ns->edn ztx curr-ns)
+          collect-models (make-list-models curr-ns)
+          relevant-nsx (->> (get curr-ns-data 'import)
+                            (into #{'zen curr-ns})
+                            vec)]
+      (->> (select-keys (:ns ztx) relevant-nsx)
+           (mapcat collect-models)
+           (filter (fn [sym]
+                     (tagged? ztx sym #{'zen/tag})))
+           sort
+           (mapv str))))
 
 (defn find-completions [ztx {:keys [uri struct-path]}]
   (cond
@@ -111,7 +190,7 @@
 
     ;; suggest models to confirm to
     (= :confirms (last struct-path))
-    (find-models-to-confirm @ztx uri)
+    (find-models-to-confirm @ztx uri struct-path)
 
     (= :zen/tags (last struct-path))
     (find-models-to-complete-tags @ztx uri)

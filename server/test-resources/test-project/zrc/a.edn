@@ -1,0 +1,10 @@
+{ns a
+ import #{c, b}
+
+ schema
+ {:zen/tags #{zen/schema}
+  :confirms #{c/schema}
+  :type zen/map
+  :keys {:bar {:confirms #{b/schema}}
+         :baz {:confirms #{b/schema}}}
+  :zen/desc "A cool schema"}}
