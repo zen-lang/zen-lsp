@@ -16,6 +16,7 @@
    [zen.core :as zen]
    [zen.store :as store])
   (:import
+   [java.io File]
    [java.util.concurrent CompletableFuture]
    [org.eclipse.lsp4j
     Diagnostic
@@ -437,7 +438,12 @@
       (when (fs/exists? config-file)
         (let [config (edn/read-string (slurp config-file))]
           (when-let [paths (:paths config)]
-            (swap! zen-ctx assoc :paths (mapv #(str (fs/file root %)) paths))))))))
+            (swap! zen-ctx assoc :paths (mapv #(str (fs/file root %)) paths))))))
+
+    (info "Find zrc dir in root" root)
+    (when-first [zrc-dir (->> (io/file root) file-seq (filter #(= (.getName ^File %) "zrc")))]
+      (swap! zen-ctx update :package-paths (fnil conj []) (.getParent ^File zrc-dir))))
+  )
 
 (def server
   (proxy [LanguageServer] []
