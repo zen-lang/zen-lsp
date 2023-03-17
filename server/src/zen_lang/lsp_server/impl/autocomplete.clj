@@ -97,23 +97,23 @@
 
 (defn deduce-lvl [{:keys [struct-path]}]
   (cond
-      (or (empty? struct-path)
-          (and (= 1 (count struct-path))
-               (some #(str/starts-with? (first struct-path) %)
-                     (map str ns-keys))))
-      [:namespace-keys]
+    (contains? ns-keys (first struct-path))
+    [:namespace-values]
 
-      (contains? ns-keys (first struct-path))
-      [:namespace-values]
+    (or (empty? struct-path)
+        (and (= 1 (count struct-path))
+             (some #(str/starts-with? (first struct-path) %)
+                   (map str ns-keys))))
+    [:namespace-keys]
 
-      (= 1 (count struct-path))
-      [:top-level-symbol-definition]
+    (= 1 (count struct-path))
+    [:top-level-symbol-definition]
 
-      (or (= 3 (count struct-path))
-          (= 2 (count struct-path)))
-      [:top-level-symbol-definition-value]
+    (or (= 3 (count struct-path))
+        (= 2 (count struct-path)))
+    [:top-level-symbol-definition-value]
 
-      :else []))
+    :else []))
 
 
 (defn find-completions [ztx {:as params :keys [uri struct-path edn last-valid-edn]}]
