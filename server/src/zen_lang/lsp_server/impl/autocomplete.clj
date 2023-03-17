@@ -1,5 +1,7 @@
 (ns zen-lang.lsp-server.impl.autocomplete
   (:require [clojure.set :as set]
+            [clojure.string :as str]
+            [clojure.core.match :as match]
             [rewrite-clj.node :as n]))
 
 
@@ -43,26 +45,28 @@
     completions))
 
 
-(defn get-other-namespaces [ztx cur-ns]
+(defn get-other-namespaces [ztx {:keys [cur-ns]}]
   (disj (set (keys (:ns @ztx)))
         nil
         cur-ns))
 
 
+(defn get-current-ns-name [ztx {:keys [uri]}]
+  (when-let [[_ ns-path] (re-find #"zrc/(.+?).edn$" uri)]
+    (symbol (str/replace ns-path \/ \.))))
+
+
 (defmethod lvl-completions :namespace-values
-  [ztx _ {:keys [cur-ns-edn cur-ns struct-path]}]
-  (case (count struct-path)
-    1 (case (first struct-path)
-        (:ns ns)         []
-        (:import import) [#{}]
-        (:alias alias)   (get-other-namespaces ztx cur-ns)
-        [])
-    2 (case (first struct-path)
-        (:ns ns)         []
-        (:import import) (get-other-namespaces ztx cur-ns)
-        (:alias alias)   (get-other-namespaces ztx cur-ns)
-        [])
-    []))
+  [ztx _ {:as params :keys [struct-path]}]
+  (match/match struct-path
+               [(:or 'ns :ns) & _]       [(get-current-ns-name ztx params)]
+
+               [(:or 'import :import)]   [#{}]
+               [(:or 'import :import) _] (get-other-namespaces ztx params)
+
+               [(:or 'alias :alias)]     (get-other-namespaces ztx params)
+               [(:or 'alias :alias) _]   (get-other-namespaces ztx params)
+               :else []))
 
 
 (defn deduce-lvl [{:keys [struct-path]}]
