@@ -3,7 +3,7 @@
  :deps {org.clojure/clojure  {:mvn/version "1.11.1"}
         org.eclipse.lsp4j/org.eclipse.lsp4j {:mvn/version "0.12.0"}
         zen-lang/zen         {:git/url "https://github.com/zen-lang/zen"
-                              :sha "d50b0a9942f6c1e988ab5655ea07b87157c5c329"}
+                              :sha "06c94e575c9e8c348d13dc479c5ece2bbc91e983"}
         rewrite-clj/rewrite-clj {:mvn/version "1.0.682-alpha"}
         babashka/fs {:mvn/version "0.1.0"}}
 
