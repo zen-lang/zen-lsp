@@ -2,7 +2,8 @@
   (:require [clojure.set :as set]
             [clojure.string :as str]
             [clojure.core.match :as match]
-            [rewrite-clj.node :as n]))
+            [rewrite-clj.node :as n]
+            [zen.core]))
 
 
 (defn get-zen-ns [zen-ns-map]
@@ -69,14 +70,50 @@
                :else []))
 
 
+(defn get-props [ztx]
+  (-> (set (zen.core/get-tag ztx 'zen/property))
+      (disj 'zen/name 'zen/file 'zen/zen-path)))
+
+
+(defmethod lvl-completions :top-level-symbol-definition
+  [ztx _ {:as params :keys [struct-path]}]
+  (->> (get-props ztx)
+       (mapv keyword)))
+
+(defmethod lvl-completions :top-level-symbol-definition-value
+  [ztx _ {:as params :keys [struct-path]}]
+  (when (and (qualified-keyword? (second struct-path))
+             (= "zen" (namespace (second struct-path))))
+    (case (second struct-path)
+      :zen/tags (zen.core/get-tag ztx 'zen/tag)
+      :zen/desc ["\"\""])
+    #_(let [sch (zen.core/get-symbol ztx (symbol (last struct-path)))]
+      (case (:type sch)
+        zen/set     [#{}]
+        zen/vector  [[]]
+        zen/string  ["\"\""]
+        zen/keyword [":"]))))
+
+
 (defn deduce-lvl [{:keys [struct-path]}]
-  (cond-> []
+  (cond
       (or (empty? struct-path)
-          (= 1 (count struct-path)))
-      (conj :namespace-keys)
+          (and (= 1 (count struct-path))
+               (some #(str/starts-with? (first struct-path) %)
+                     (map str ns-keys))))
+      [:namespace-keys]
 
       (contains? ns-keys (first struct-path))
-      (conj :namespace-values)))
+      [:namespace-values]
+
+      (= 1 (count struct-path))
+      [:top-level-symbol-definition]
+
+      (or (= 3 (count struct-path))
+          (= 2 (count struct-path)))
+      [:top-level-symbol-definition-value]
+
+      :else []))
 
 
 (defn find-completions [ztx {:as params :keys [uri struct-path edn last-valid-edn]}]
@@ -88,7 +125,6 @@
                             :cur-ns cur-ns
                             :cur-ns-map ns-map)
         lvl (deduce-lvl compl-params)
-        _ (prn :lvl lvl)
         completions (->> lvl
                          (mapcat #(lvl-completions ztx % compl-params))
                          (mapv str)
