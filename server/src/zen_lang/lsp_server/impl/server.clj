@@ -272,21 +272,22 @@
          character (inc character)
          text (get-in @zen-ctx [:file uri :last-valid-text])
          parsed (p/parse-string text)
-         node (try (some-> parsed
-                           (location->zloc
-                            line
-                            character)
-                           loc/zloc->node)
+         node (try (some-> parsed (location->zloc line character) loc/zloc->node)
                    (catch Exception e (debug (ex-message e))))
          sym (:value node)
-         uri (when (symbol? sym)
-               (let [ns (or (some-> (namespace sym) symbol)
-                            sym)]
-                 (when-let [file (get-in @zen-ctx [:ns ns :zen/file])]
-                   (let [ uri (str (.toURI (io/file file)))]
-                     uri))))]
-     (when uri
-       (vec [(org.eclipse.lsp4j.Location. uri (Range. (Position. 0 0) (Position. 0 1)))])))))
+         loc (when (symbol? sym)
+               (let [ns' (or (some-> (namespace sym) symbol) sym)]
+                 (when-let [file (get-in @zen-ctx [:ns ns' :zen/file])]
+                   (when-let [{:keys [row col end-row end-col]} (some-> @zen-ctx :symbols (find sym) first meta)]
+                     (when (and row col end-row end-col)
+                       {:uri (str (.toURI (io/file file)))
+                        :row (dec row)
+                        :col (dec col)
+                        :end-row (dec end-row)
+                        :end-col (dec end-col)})))))]
+     (when loc
+       (vec [(org.eclipse.lsp4j.Location. (:uri loc) (Range. (Position. (:row loc) (:col loc))
+                                                             (Position. (:end-row loc) (:end-col loc))))])))))
 
 (defn hover-params->clj
   [^org.eclipse.lsp4j.HoverParams params]
@@ -481,6 +482,35 @@
     (reset! proxy-state proxy)
     (.startListening launcher)
     (debug "started")))
+
+;; private void startConnection() throws IOException {
+;;   Launcher<JavaLanguageClient> launcher;
+;;   ExecutorService executorService = Executors.newCachedThreadPool();
+;;   protocol = new JDTLanguageServer(projectsManager, preferenceManager);
+;;   if (JDTEnvironmentUtils.inSocketStreamDebugMode()) {
+;;     String host = JDTEnvironmentUtils.getClientHost();
+;;     Integer port = JDTEnvironmentUtils.getClientPort();
+;;     InetSocketAddress inetSocketAddress = new InetSocketAddress(host, port);
+;;     AsynchronousServerSocketChannel serverSocket = AsynchronousServerSocketChannel.open().bind(inetSocketAddress);
+;;     try {
+;;       AsynchronousSocketChannel socketChannel = serverSocket.accept().get();
+;;       InputStream in = Channels.newInputStream(socketChannel);
+;;       OutputStream out = Channels.newOutputStream(socketChannel);
+;;       Function<MessageConsumer, MessageConsumer> messageConsumer = it -> it;
+;;       launcher = Launcher.createIoLauncher(protocol, JavaLanguageClient.class, in, out, executorService, messageConsumer);
+;;     } catch (InterruptedException | ExecutionException e) {
+;;       throw new RuntimeException("Error when opening a socket channel at " + host + ":" + port + ".", e);
+;;     }
+;;   } else {
+;;     ConnectionStreamFactory connectionFactory = new ConnectionStreamFactory();
+;;     InputStream in = connectionFactory.getInputStream();
+;;     OutputStream out = connectionFactory.getOutputStream();
+;;     Function<MessageConsumer, MessageConsumer> wrapper = new ParentProcessWatcher(this.languageServer);
+;;     launcher = Launcher.createLauncher(protocol, JavaLanguageClient.class, in, out, executorService, wrapper);
+;;   }
+;;   protocol.connectClient(launcher.getRemoteProxy());
+;;   launcher.startListening();
+;; }
 
 (Thread/setDefaultUncaughtExceptionHandler
  (proxy [Thread$UncaughtExceptionHandler] []
