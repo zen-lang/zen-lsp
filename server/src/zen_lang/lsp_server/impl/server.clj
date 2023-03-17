@@ -236,6 +236,7 @@
                       ;; this shouldn't throw
                       (try (p/parse-string last-valid-text)
                            (catch Exception e (debug (ex-message e))))))
+        parsed-last-valid (p/parse-string last-valid-text)
         path (try (some-> parsed
                           (location->zloc
                            line
@@ -245,12 +246,14 @@
         ;; TODO: provide path and last-valid-text to zen.core function that uses
         ;; it to provide better completions
         _ (debug :path path)
-        namespaces (keys (:ns @zen-ctx))
-        symbols (keys (:symbols @zen-ctx))
-        zen-completions' (autocomplete/find-completions zen-ctx {:uri uri :struct-path path})
+        zen-completions' (autocomplete/find-completions
+                           zen-ctx {:uri            uri
+                                    :struct-path    path
+                                    :edn            parsed
+                                    :last-valid-edn parsed-last-valid})
         completions (map #(org.eclipse.lsp4j.CompletionItem. %)
-                         (or zen-completions'
-                             (map str (concat namespaces symbols))))]
+                         zen-completions')]
+
     (CompletableFuture/completedFuture
      (vec completions))))
 

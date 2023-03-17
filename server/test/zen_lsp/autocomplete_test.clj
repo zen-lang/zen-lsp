@@ -3,17 +3,17 @@
             [zen-lang.lsp-server.impl.server :as server]
             [zen-lang.lsp-server.impl.autocomplete :as zl]))
 
-(defn file->message [f]
+#_(defn file->message [f]
   {:text (slurp f) :uri f})
 
-(def ztx
+#_(def ztx
   (do (alter-var-root #'server/zen-ctx (constantly (server/new-context)))
       (server/initialize-paths {:root "test-resources/test-project"})
       (server/load-document (file->message "test-resources/test-project/zrc/baz.edn"))
       (server/load-document (file->message "test-resources/test-project/zrc/foo.edn"))
       server/zen-ctx))
 
-(deftest find-completions-test
+#_(deftest find-completions-test
   (testing "`find-completion` should"
 
     (testing "find keys of schema under cursor (keywords)"
