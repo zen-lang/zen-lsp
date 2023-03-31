@@ -3,6 +3,7 @@
   (:require [zen.core :as zen]
             [clojure.java.io :as io]
             [rewrite-clj.parser :as p]
+            [rewrite-clj.zip :as z]
             [zen-lang.lsp-server.impl.location :as loc
              :refer [location->zloc]]
             [zen-lang.lsp-server.impl.log :refer [debug]]))
@@ -20,17 +21,43 @@
         character (inc character)
         text (get-in @zen-ctx [:file uri :last-valid-text])
         parsed (p/parse-string text)
-        node (try (some-> parsed (location->zloc line character) loc/zloc->node)
+        zloc (try (some-> parsed (location->zloc line character))
+                  (catch Exception e (debug (ex-message e))))
+        node (try (some-> zloc loc/zloc->node)
+                  (catch Exception e (debug (ex-message e))))
+        path (try (some-> zloc loc/zloc->path)
                   (catch Exception e (debug (ex-message e))))
         sym (:value node)]
     (when (symbol? sym)
-      (let [ns (or (some-> (namespace sym) symbol) sym)]
-        (when-let [file (get-zen-file zen-ctx ns)]
-          (when-let [{:keys [row col end-row end-col]}
+      (cond
+        (namespace sym)
+        (when-let [file (get-zen-file zen-ctx (symbol (namespace sym)))]
+          (when-let [{:keys [row col end-row end-col] :as _loc}
                      (some-> @zen-ctx :symbols (find sym) first meta)]
             (when (and row col end-row end-col)
               {:uri (str (.toURI (io/file file)))
                :row (dec row)
                :col (dec col)
                :end-row (dec end-row)
-               :end-col (dec end-col)})))))))
+               :end-col (dec end-col)})))
+
+        (and (= 2 (count path)) (= 'import (first path)))
+        (when-let [file (get-zen-file zen-ctx sym)]
+          {:uri (str (.toURI (io/file file)))
+           :row 0
+           :col 0
+           :end-row 0
+           :end-col 0})
+
+        (-> (loc/get-in (z/edn parsed) ['ns]) first :value)
+        (let [ns (-> (loc/get-in (z/edn parsed) ['ns]) first :value)
+              sym (symbol (str ns) (str sym))]
+          (when-let [file (get-zen-file zen-ctx ns)]
+            (when-let [{:keys [row col end-row end-col] :as _loc}
+                       (some-> @zen-ctx :symbols (find sym) first meta)]
+              (when (and row col end-row end-col)
+                {:uri (str (.toURI (io/file file)))
+                 :row (dec row)
+                 :col (dec col)
+                 :end-row (dec end-row)
+                 :end-col (dec end-col)}))))))))

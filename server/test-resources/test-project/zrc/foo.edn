@@ -7,4 +7,9 @@
   :keys {:bar {:confirms #{bar/schema}} ;; No errors expected
          :baz {:confirms #{baz/schema}} ;; Expected error: "Expected type of 'set, got symbol"
          }
-  :zen/desc "A cool schema"}}
+  :zen/desc "A cool schema"}
+
+ schema2
+ {:zen/tags #{zen/schema}
+  :type zen/map
+  :confirms #{schema bar/schema}}}
