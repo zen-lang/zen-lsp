@@ -1,8 +1,16 @@
 {ns bar
  import #{foo}
 
+
+ matag
+ {:zen/tags #{zen/tag zen/schema}
+  :type zen/map
+  :keys {:qwerty {:type zen/string}}}
+
+
  schema
  {:zen/tags #{zen/schema}
+
   :type zen/map
   :keys {:foo {:confirms #{foo/schema}} ;; No errors expected
          }}

@@ -76,9 +76,13 @@
 
 
 (defmethod lvl-completions :top-level-symbol-definition
-  [ztx _ {:as params :keys [struct-path]}]
-  (->> (get-props ztx)
-       (mapv keyword)))
+  [ztx _ {:as params :keys [struct-path cur-ns-map]}]
+  (let [keys-from-tags (some->> (get-in cur-ns-map (conj struct-path :zen/tags))
+                    (mapcat (fn [sym] (keys (:keys (zen.core/get-symbol ztx sym))))))]
+    (into (->> (get-props ztx)
+               (mapv keyword))
+          keys-from-tags)))
+
 
 (defmethod lvl-completions :top-level-symbol-definition-value
   [ztx _ {:as params :keys [struct-path]}]
