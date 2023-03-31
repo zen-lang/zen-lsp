@@ -13,7 +13,9 @@
     :refer [get-location
             location->zloc
             zloc->path]]
-   [zen.core :as zen]
+   [zen-lang.lsp-server.impl.definition :as definition]
+   [zen-lang.lsp-server.impl.state :refer [zen-ctx proxy-state]]
+   [zen-lang.lsp-server.impl.log :refer [error warn info debug]]
    [zen.store :as store])
   (:import
    [java.io File]
@@ -31,8 +33,6 @@
     InitializeParams
     InitializeResult
     InitializedParams
-    MessageParams
-    MessageType
     Position
     PublishDiagnosticsParams
     Range
@@ -43,39 +43,6 @@
    [org.eclipse.lsp4j.services LanguageServer TextDocumentService WorkspaceService LanguageClient]))
 
 (set! *warn-on-reflection* true)
-
-(defn new-context []
-  (zen/new-context {:unsafe true}))
-
-(defonce zen-ctx (new-context))
-
-(defonce proxy-state (atom nil))
-
-(defn log! [level & msg]
-  (when-let [client @proxy-state]
-    (let [msg (str/join " " msg)]
-      (.logMessage ^LanguageClient client
-                   (MessageParams. (case level
-                                     :error MessageType/Error
-                                     :warning MessageType/Warning
-                                     :info MessageType/Info
-                                     :debug MessageType/Log
-                                     MessageType/Log) msg)))))
-
-(defn error [& msgs]
-  (apply log! :error msgs))
-
-(defn warn [& msgs]
-  (apply log! :warn msgs))
-
-(defn info [& msgs]
-  (apply log! :info msgs))
-
-(def debug? (= "true" (System/getenv "ZEN_LSP_DEBUG")))
-
-(defn debug [& msgs]
-  (when debug?
-    (apply log! :debug msgs)))
 
 (defmacro do! [& body]
   `(try ~@body
@@ -268,29 +235,11 @@
                 :character character}
      :uri uri}))
 
-(defn definition [{:keys [uri position]}]
+(defn definition [arg]
   (CompletableFuture/completedFuture
-   (let [{:keys [line character]} position
-         line (inc line) ;; lsp lines are 0-based, rewrite-clj lines are 1-based
-         character (inc character)
-         text (get-in @zen-ctx [:file uri :last-valid-text])
-         parsed (p/parse-string text)
-         node (try (some-> parsed (location->zloc line character) loc/zloc->node)
-                   (catch Exception e (debug (ex-message e))))
-         sym (:value node)
-         loc (when (symbol? sym)
-               (let [ns' (or (some-> (namespace sym) symbol) sym)]
-                 (when-let [file (get-in @zen-ctx [:ns ns' :zen/file])]
-                   (when-let [{:keys [row col end-row end-col]} (some-> @zen-ctx :symbols (find sym) first meta)]
-                     (when (and row col end-row end-col)
-                       {:uri (str (.toURI (io/file file)))
-                        :row (dec row)
-                        :col (dec col)
-                        :end-row (dec end-row)
-                        :end-col (dec end-col)})))))]
-     (when loc
-       (vec [(org.eclipse.lsp4j.Location. (:uri loc) (Range. (Position. (:row loc) (:col loc))
-                                                             (Position. (:end-row loc) (:end-col loc))))])))))
+    (when-let [loc (definition/find-definition zen-ctx arg)]
+      (vec [(org.eclipse.lsp4j.Location. (:uri loc) (Range. (Position. (:row loc) (:col loc))
+                                                            (Position. (:end-row loc) (:end-col loc))))]))))
 
 (defn hover-params->clj
   [^org.eclipse.lsp4j.HoverParams params]
